@@ -1,0 +1,16 @@
+[workspace]
+resolver = "3"
+members = [
+    "vds-site",
+    "vds-server",
+    "xtask"
+]
+
+[workspace.dependencies]
+actix-web = "4"
+actix-files = "0.6"
+diesel = { version = "2.2.0", features = ["postgres"] }
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+xshell = "0.2.7"
+yew = { version="0.21", features=["csr"] }
