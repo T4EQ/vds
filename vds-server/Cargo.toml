@@ -5,8 +5,9 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-actix-web.workspace = true
 actix-files.workspace = true
+actix-web.workspace = true
 anyhow.workspace = true
-diesel.workspace = true
 clap.workspace = true
+diesel.workspace = true
+serde.workspace = true

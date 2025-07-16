@@ -6,4 +6,11 @@ description = "Video delivery system frontend site"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+gloo-net.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wasm-bindgen-futures.workspace = true
+wasm-logger.workspace = true
+web-sys.workspace = true
 yew.workspace = true
