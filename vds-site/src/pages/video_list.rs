@@ -1,8 +1,36 @@
+use vds_api::api::content::local::get::{Video, VideoStatus};
 use yew::prelude::*;
+
+#[derive(yew::Properties, PartialEq, Eq)]
+pub struct VideoCardProps {
+    index: usize,
+    video: Video,
+}
+
+#[function_component(VideoCard)]
+pub fn video_card(VideoCardProps { index, video }: &VideoCardProps) -> Html {
+    let byte_to_megabytes = |bytes: usize| bytes as f64 / 1024.0 / 1024.0;
+
+    html! {
+
+        <div class="video-card" key={*index}>
+            <div class="video-icon">
+                <span class="play-icon">{ "▶" }</span>
+            </div>
+            <div class="video-info">
+                <h3 class="video-title">{ &video.name }</h3>
+                <div class="video-meta">
+                    <span class="video-size">{ byte_to_megabytes(video.size) } {" MB"}</span>
+                    <span class="video-id">{"ID: "} { &video.id }</span>
+                </div>
+            </div>
+            <button class="play-button">{ "Play" }</button>
+        </div>
+    }
+}
 
 #[function_component(VideoList)]
 pub fn video_list() -> Html {
-    use vds_api::api::content::local::get::{Video, VideoStatus};
     let videos: Vec<Video> = vec![
         Video {
             id: "1".to_string(),
@@ -36,8 +64,6 @@ pub fn video_list() -> Html {
         },
     ];
 
-    let byte_to_megabytes = |bytes: usize| bytes as f64 / 1024.0 / 1024.0;
-
     html! {
         <div class="dashboard">
             <header class="dashboard-header">
@@ -46,20 +72,8 @@ pub fn video_list() -> Html {
             </header>
 
             <div class="video-grid">
-                { for videos.iter().enumerate().map(|(index, video)| html! {
-                    <div class="video-card" key={index}>
-                        <div class="video-icon">
-                            <span class="play-icon">{ "▶" }</span>
-                        </div>
-                        <div class="video-info">
-                            <h3 class="video-title">{ &video.name }</h3>
-                            <div class="video-meta">
-                                <span class="video-size">{ byte_to_megabytes(video.size) } {" MB"}</span>
-                                <span class="video-id">{"ID: "} { &video.id }</span>
-                            </div>
-                        </div>
-                        <button class="play-button">{ "Play" }</button>
-                    </div>
+                { for videos.into_iter().enumerate().map(|(index, video)| html! {
+                    <VideoCard video={video} index={index} />
                 }) }
             </div>
         </div>
