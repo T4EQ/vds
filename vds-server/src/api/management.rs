@@ -1,31 +1,40 @@
-use actix_web::{HttpResponse, Responder, delete, get, post, web};
+use actix_web::{HttpResponse, Responder, delete, get, put, web};
 
 #[get("/content/remote")]
 async fn list_remote_content() -> impl Responder {
     // TODO(javier-varez): Actually list remote content
-    HttpResponse::Ok().body("No remote content")
+    use vds_api::api::content::remote::get::Response;
+    let response = Response { videos: vec![] };
+    HttpResponse::Ok().json(response)
 }
 
 #[get("/content/local")]
-async fn list_local_content() -> impl Responder {
+async fn list_local_content(
+    web::Query(query): web::Query<vds_api::api::content::local::get::Query>,
+) -> impl Responder {
+    use vds_api::api::content::local::get::Response;
+
     // TODO(javier-varez): Actually list db content
-    HttpResponse::Ok().body("No local content")
+    let response = if let Some(_id) = query.id {
+        Response::Single(None)
+    } else {
+        Response::Collection(vec![])
+    };
+    HttpResponse::Ok().json(response)
 }
 
-#[delete("/content/local/{name}")]
-async fn delete_local_content(name: web::Path<String>) -> impl Responder {
+#[delete("/content/local")]
+async fn delete_local_content(
+    web::Query(_query): web::Query<vds_api::api::content::local::delete::Query>,
+) -> impl Responder {
     // TODO(javier-varez): Actually remove db content
-    HttpResponse::Ok().body(format!("Deleted {name}"))
+    HttpResponse::NoContent()
 }
 
-#[post("/content/cache")]
-async fn cache_content() -> impl Responder {
-    // TODO(javier-varez): Figure out how this request will look like
-    HttpResponse::Ok().body("")
-}
-
-#[get("/content/get")]
-async fn get_content() -> impl Responder {
-    // TODO(javier-varez): Figure out how to serve content as video
-    HttpResponse::Ok().body("")
+#[put("/content/local")]
+async fn cache_content(
+    web::Query(_query): web::Query<vds_api::api::content::local::put::Query>,
+) -> impl Responder {
+    // TODO(javier-varez): Actually implement
+    HttpResponse::Ok()
 }

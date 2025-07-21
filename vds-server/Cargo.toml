@@ -11,3 +11,4 @@ anyhow.workspace = true
 clap.workspace = true
 diesel.workspace = true
 serde.workspace = true
+vds-api.path = "../vds-api"
