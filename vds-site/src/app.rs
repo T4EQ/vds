@@ -2,14 +2,17 @@ use yew::prelude::*;
 use yew_router::prelude::*;
 
 use crate::pages::admin::AdminPage;
+use crate::pages::player::VideoPlayer;
 use crate::pages::video_list::VideoList;
 
-#[derive(Debug, Clone, Copy, PartialEq, Routable)]
-enum Route {
+#[derive(Debug, Clone, PartialEq, Routable)]
+pub enum Route {
     #[at("/")]
     Home,
     #[at("/admin")]
     Admin,
+    #[at("/player/:id")]
+    Player { id: String },
 }
 
 fn switch(route: Route) -> Html {
@@ -24,6 +27,12 @@ fn switch(route: Route) -> Html {
             html! {
                 <AdminPage>
                 </AdminPage>
+            }
+        }
+        Route::Player { id } => {
+            html! {
+                <VideoPlayer id={id}>
+                </VideoPlayer>
             }
         }
     }

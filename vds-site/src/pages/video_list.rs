@@ -1,9 +1,11 @@
 use gloo_net::http::Request;
-use vds_api::api::content::local::get::{Response, Video};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
+use yew_router::prelude::*;
 
-use super::player::VideoPlayer;
+use vds_api::api::content::local::get::{Response, Video};
+
+use crate::app::Route;
 
 #[derive(yew::Properties, PartialEq, Eq)]
 pub struct VideoCardProps {
@@ -15,35 +17,20 @@ pub struct VideoCardProps {
 pub fn video_card(VideoCardProps { index, video }: &VideoCardProps) -> Html {
     let byte_to_megabytes = |bytes: usize| bytes as f64 / 1024.0 / 1024.0;
 
-    let show_video = use_state(|| false);
-
-    let action = {
-        let show_video = show_video.clone();
-        move |_| {
-            show_video.set(true);
-        }
-    };
-
-    if *show_video {
-        html! {
-            <VideoPlayer id={video.id.clone()}/>
-        }
-    } else {
-        html! {
-            <div class="video-card" key={*index}>
-                <div class="video-icon">
-                    <span class="play-icon">{ "▶" }</span>
-                </div>
-                <div class="video-info">
-                    <h3 class="video-title">{ &video.name }</h3>
-                    <div class="video-meta">
-                        <span class="video-size">{ byte_to_megabytes(video.size) } {" MB"}</span>
-                        <span class="video-id">{"ID: "} { &video.id }</span>
-                    </div>
-                </div>
-                <button class="play-button" onclick={action}>{ "Play" }</button>
+    html! {
+        <div class="video-card" key={*index}>
+            <div class="video-icon">
+                <span class="play-icon">{ "▶" }</span>
             </div>
-        }
+            <div class="video-info">
+                <h3 class="video-title">{ &video.name }</h3>
+                <div class="video-meta">
+                    <span class="video-size">{ byte_to_megabytes(video.size) } {" MB"}</span>
+                    <span class="video-id">{"ID: "} { &video.id }</span>
+                </div>
+            </div>
+            <Link<Route> to={ Route::Player{ id: video.id.clone() }} classes={classes!{"play-button"}}>{ "Play" }</Link<Route>>
+        </div>
     }
 }
 
