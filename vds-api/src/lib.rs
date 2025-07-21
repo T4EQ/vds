@@ -7,7 +7,7 @@ pub mod api {
 
         pub mod remote {
             pub mod get {
-                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, Clone)]
                 pub struct Video {
                     pub id: String,
                     pub name: String,
@@ -19,19 +19,24 @@ pub mod api {
                 pub struct Response {
                     pub videos: Vec<Video>,
                 }
+
+                #[derive(Default, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+                pub struct Query {
+                    pub max: Option<usize>,
+                }
             }
         }
 
         pub mod local {
             pub mod get {
-                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, Clone)]
                 pub enum VideoStatus {
                     Downloading,
                     Downloaded,
                     Failed,
                 }
 
-                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, Clone)]
                 pub struct Video {
                     pub id: String,
                     pub name: String,
@@ -42,6 +47,8 @@ pub mod api {
                 #[derive(Default, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub struct Query {
                     pub id: Option<String>,
+                    /// Maximum number of results to return
+                    pub max: Option<usize>,
                 }
 
                 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
