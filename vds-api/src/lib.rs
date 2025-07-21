@@ -7,7 +7,7 @@ pub mod api {
 
         pub mod remote {
             pub mod get {
-                #[derive(Debug, serde::Deserialize, serde::Serialize)]
+                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub struct Video {
                     pub id: String,
                     pub name: String,
@@ -15,7 +15,7 @@ pub mod api {
                     pub local: bool,
                 }
 
-                #[derive(Default, Debug, serde::Deserialize, serde::Serialize)]
+                #[derive(Default, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub struct Response {
                     pub videos: Vec<Video>,
                 }
@@ -24,14 +24,14 @@ pub mod api {
 
         pub mod local {
             pub mod get {
-                #[derive(Debug, serde::Deserialize, serde::Serialize)]
+                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub enum VideoStatus {
                     Downloading,
                     Downloaded,
                     Failed,
                 }
 
-                #[derive(Debug, serde::Deserialize, serde::Serialize)]
+                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub struct Video {
                     pub id: String,
                     pub name: String,
@@ -39,12 +39,12 @@ pub mod api {
                     pub status: VideoStatus,
                 }
 
-                #[derive(Default, Debug, serde::Deserialize, serde::Serialize)]
+                #[derive(Default, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub struct Query {
                     pub id: Option<String>,
                 }
 
-                #[derive(Debug, serde::Deserialize, serde::Serialize)]
+                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub enum Response {
                     Single(Option<Video>),
                     Collection(Vec<Video>),
@@ -52,21 +52,21 @@ pub mod api {
             }
 
             pub mod delete {
-                #[derive(Debug, serde::Deserialize, serde::Serialize)]
+                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub struct Query {
                     pub id: String,
                 }
             }
 
             pub mod put {
-                #[derive(Debug, serde::Deserialize, serde::Serialize)]
+                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub struct Query {
                     pub id: String,
                 }
             }
         }
 
-        #[derive(Debug, serde::Deserialize, serde::Serialize)]
+        #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
         pub struct Query {
             pub id: String,
         }
