@@ -65,7 +65,11 @@ fn run(args: &RunArgs) -> anyhow::Result<()> {
 
     let release = args.build_args.release.then_some("--release");
     let shell = xshell::Shell::new()?;
-    cmd!(shell, "cargo run {release...} --bin vds-server").run()?;
+    cmd!(
+        shell,
+        "cargo run {release...} --bin vds-server -- --content-path video-data"
+    )
+    .run()?;
 
     Ok(())
 }
