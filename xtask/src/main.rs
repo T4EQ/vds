@@ -5,6 +5,15 @@ use xshell::cmd;
 struct BuildArgs {
     #[arg(long, short)]
     release: bool,
+
+    #[arg(long, short = 'j', default_value = "0")]
+    num_threads: u64,
+
+    #[arg(long)]
+    offline: bool,
+
+    #[arg(long)]
+    target: String,
 }
 
 #[derive(Debug, clap::Args)]
@@ -26,19 +35,24 @@ struct Args {
 }
 
 fn build(args: &BuildArgs) -> anyhow::Result<()> {
-    // TODO(javier-varez): Check and install build dependencies
-
     let release = args.release.then_some("--release");
+    let offline = args.offline.then_some("--offline");
+    let num_threads = &(args.num_threads > 0).then_some(format!("-j={}", args.num_threads));
+    let target = &(!args.target.is_empty()).then_some(format!("--target={}", args.target));
 
     // First build the frontend and package it using trunk
     let shell = xshell::Shell::new()?;
     {
         let _dir = shell.push_dir("vds-site");
-        cmd!(shell, "trunk build {release...}").run()?;
+        cmd!(shell, "trunk build {offline...} {release...}").run()?;
     }
 
     // Now build the backend
-    cmd!(shell, "cargo build {release...}").run()?;
+    cmd!(
+        shell,
+        "cargo build {offline...} {release...} {num_threads...} {target...}"
+    )
+    .run()?;
 
     Ok(())
 }
