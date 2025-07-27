@@ -9,9 +9,6 @@ struct Args {
 
     #[arg(short, long, default_value = "8080")]
     port: u16,
-
-    #[arg(short, long, default_value = "./")]
-    web_data: String,
 }
 
 #[actix_web::main]
@@ -19,6 +16,6 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let listener = TcpListener::bind(format!("{}:{}", args.listen_address, args.port))?;
     println!("Listening on {}", listener.local_addr()?);
-    vds_server::run_app(listener, args.web_data)?.await?;
+    vds_server::run_app(listener)?.await?;
     Ok(())
 }

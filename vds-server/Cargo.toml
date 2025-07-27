@@ -5,10 +5,14 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-actix-files.workspace = true
+actix-web-static-files.workspace = true
 actix-web.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 diesel.workspace = true
 serde.workspace = true
+static-files.workspace = true
 vds-api.path = "../vds-api"
+
+[build-dependencies]
+static-files.workspace = true

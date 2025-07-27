@@ -71,6 +71,7 @@
             pkgs.trunk
             pkgs.wasm-bindgen-cli
             pkgs.dart-sass
+            pkgs.cargo-watch
           ];
         };
 
