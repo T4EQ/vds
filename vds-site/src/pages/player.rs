@@ -66,7 +66,7 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
                 <h1>{name}</h1>
             </header>
 
-            <video controls=true autoplay=true>
+            <video controls=true autoplay=true class="video-player">
                 <source src={path} type="video/mp4" />
             </video>
         </div>

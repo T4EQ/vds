@@ -1,23 +1,30 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 html,
 body {
   height: 100%;
+  width: 100%;
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 body {
+  height: 100%;
+  width: 100%;
   align-items: center;
   display: flex;
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
 }
 
 /* Dashboard Styles */
 .dashboard {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 2rem;
+  height: 100%;
+  width: 100%;
+  overflow: scroll;
 }
 
 .dashboard-header {
@@ -42,17 +49,16 @@ body {
 
 .video-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(20em, 1fr));
   gap: 1.5rem;
-  max-width: 1200px;
+  max-width: 100%;
   margin: 0 auto;
 }
 
 .video-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   padding: 1.5rem;
   transition: all 0.3s ease;
   display: flex;
@@ -74,6 +80,10 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.video-icon.disabled {
+  background: linear-gradient(135deg, #505050 0%, #d0d0d0 100%);
 }
 
 .play-icon {
@@ -134,29 +144,13 @@ body {
   transform: translateY(0);
 }
 
-@media (max-width: 768px) {
-  .dashboard {
-    padding: 1rem;
-  }
+.play-button:disabled {
+  background: linear-gradient(135deg, #505050 0%, #d0d0d0 100%);
+}
 
-  .dashboard-header h1 {
-    font-size: 2rem;
-  }
-
-  .video-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .video-card {
-    padding: 1rem;
-  }
-
-  .video-icon {
-    width: 50px;
-    height: 50px;
-  }
-
-  .play-icon {
-    font-size: 1.25rem;
-  }
+.video-player{
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100%;
 }
