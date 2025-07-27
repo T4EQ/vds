@@ -12,6 +12,7 @@ clap.workspace = true
 diesel.workspace = true
 serde.workspace = true
 static-files.workspace = true
+tokio.workspace = true
 vds-api.path = "../vds-api"
 
 [build-dependencies]
