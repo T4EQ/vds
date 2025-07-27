@@ -1,17 +1,9 @@
-use actix_web::{App, web};
+use actix_web::web;
 
 mod management;
 mod user;
 
-pub fn register_handlers<T>(app: App<T>) -> App<T>
-where
-    T: actix_web::dev::ServiceFactory<
-            actix_web::dev::ServiceRequest,
-            Config = (),
-            Error = actix_web::Error,
-            InitError = (),
-        >,
-{
+pub fn register_handlers(app: &mut web::ServiceConfig) {
     app.service(
         web::scope("api")
             .service(management::list_remote_content)
@@ -20,5 +12,5 @@ where
             .service(management::cache_content)
             .service(user::get_content)
             .service(user::get_content_path),
-    )
+    );
 }

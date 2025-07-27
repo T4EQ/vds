@@ -1,16 +1,15 @@
 use actix_web::{App, HttpServer, dev::Server};
 
-use std::sync::Arc;
-
 use std::net::TcpListener;
 
 mod api;
+mod static_files;
 
-pub fn run_app(listener: TcpListener, files_path: String) -> anyhow::Result<Server> {
-    let files_path = Arc::new(files_path);
+pub fn run_app(listener: TcpListener) -> anyhow::Result<Server> {
     Ok(HttpServer::new(move || {
-        api::register_handlers(App::new())
-            .service(actix_files::Files::new("/", &*files_path).index_file("index.html"))
+        App::new()
+            .configure(api::register_handlers)
+            .configure(static_files::register_static_files)
     })
     .listen(listener)?
     .run())

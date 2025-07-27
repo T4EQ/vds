@@ -13,7 +13,7 @@ struct BuildArgs {
     offline: bool,
 
     #[arg(long)]
-    target: String,
+    target: Option<String>,
 }
 
 #[derive(Debug, clap::Args)]
@@ -38,7 +38,10 @@ fn build(args: &BuildArgs) -> anyhow::Result<()> {
     let release = args.release.then_some("--release");
     let offline = args.offline.then_some("--offline");
     let num_threads = &(args.num_threads > 0).then_some(format!("-j={}", args.num_threads));
-    let target = &(!args.target.is_empty()).then_some(format!("--target={}", args.target));
+    let target = &args
+        .target
+        .as_ref()
+        .map(|target| format!("--target={target}"));
 
     // First build the frontend and package it using trunk
     let shell = xshell::Shell::new()?;
@@ -62,11 +65,7 @@ fn run(args: &RunArgs) -> anyhow::Result<()> {
 
     let release = args.build_args.release.then_some("--release");
     let shell = xshell::Shell::new()?;
-    cmd!(
-        shell,
-        "cargo run {release...} --bin vds-server -- --web-data ./vds-site/dist"
-    )
-    .run()?;
+    cmd!(shell, "cargo run {release...} --bin vds-server").run()?;
 
     Ok(())
 }
