@@ -27,7 +27,7 @@ async fn list_local_content(
             id: "2".to_string(),
             name: "Basic Science Concepts".to_string(),
             size: 312 * 1024 * 1024,
-            status: VideoStatus::Downloaded,
+            status: VideoStatus::Downloading,
         },
         Video {
             id: "3".to_string(),
@@ -39,7 +39,7 @@ async fn list_local_content(
             id: "4".to_string(),
             name: "History of Ancient Civilizations".to_string(),
             size: 456 * 1024 * 1024,
-            status: VideoStatus::Downloaded,
+            status: VideoStatus::Failed,
         },
         Video {
             id: "5".to_string(),

@@ -3,7 +3,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use vds_api::api::content::local::get::{Response, Video};
+use vds_api::api::content::local::get::{Response, Video, VideoStatus};
 
 use crate::app::Route;
 
@@ -17,9 +17,27 @@ pub struct VideoCardProps {
 pub fn video_card(VideoCardProps { index, video }: &VideoCardProps) -> Html {
     let byte_to_megabytes = |bytes: usize| bytes as f64 / 1024.0 / 1024.0;
 
+    let downloaded = video.status == VideoStatus::Downloaded;
+    let play_button = if downloaded {
+        let destination = Route::Player {
+            id: video.id.clone(),
+        };
+        html! {
+            <Link<Route> to={destination} classes={"play-button"}>
+                { "Play" }
+            </Link<Route>>
+        }
+    } else {
+        html! {
+            <button disabled=true class={classes!{"play-button"}}>
+                { "Play" }
+            </button>
+        }
+    };
+
     html! {
         <div class="video-card" key={*index}>
-            <div class="video-icon">
+            <div class={classes!{"video-icon", (!downloaded).then_some("disabled")}}>
                 <span class="play-icon">{ "▶" }</span>
             </div>
             <div class="video-info">
@@ -29,7 +47,7 @@ pub fn video_card(VideoCardProps { index, video }: &VideoCardProps) -> Html {
                     <span class="video-id">{"ID: "} { &video.id }</span>
                 </div>
             </div>
-            <Link<Route> to={ Route::Player{ id: video.id.clone() }} classes={classes!{"play-button"}}>{ "Play" }</Link<Route>>
+            { play_button }
         </div>
     }
 }
@@ -83,9 +101,11 @@ pub fn video_list() -> Html {
                 </header>
 
                 <div class="video-grid">
-                    { for (*videos).iter().enumerate().map(|(index, video)| html! {
-                        <VideoCard video={video.clone()} index={index} />
-                    }) }
+                    {
+                        videos.iter().enumerate().map(|(index, video)|
+                            html! { <VideoCard video={video.clone()} index={index} /> }
+                        ).collect::<Html>()
+                    }
                 </div>
             </div>
         }
