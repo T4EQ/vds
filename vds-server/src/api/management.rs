@@ -2,7 +2,7 @@ use actix_web::{HttpResponse, Responder, delete, get, put, web};
 
 #[get("/content/remote")]
 async fn list_remote_content(
-    web::Query(_query): web::Query<vds_api::api::content::local::get::Query>,
+    web::Query(_query): web::Query<vds_api::api::content::remote::get::Query>,
 ) -> impl Responder {
     // TODO(javier-varez): Actually list remote content
     use vds_api::api::content::remote::get::Response;
@@ -14,7 +14,7 @@ async fn list_remote_content(
 async fn list_local_content(
     web::Query(query): web::Query<vds_api::api::content::local::get::Query>,
 ) -> impl Responder {
-    use vds_api::api::content::local::get::{Response, Video, VideoStatus};
+    use vds_api::api::content::local::get::{Progress, Response, Video, VideoStatus};
 
     let mut mock_videos = vec![
         Video {
@@ -27,7 +27,7 @@ async fn list_local_content(
             id: "2".to_string(),
             name: "Basic Science Concepts".to_string(),
             size: 312 * 1024 * 1024,
-            status: VideoStatus::Downloading,
+            status: VideoStatus::Downloading(Progress(0.5)),
         },
         Video {
             id: "3".to_string(),
