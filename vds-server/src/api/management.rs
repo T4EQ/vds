@@ -53,8 +53,8 @@ async fn list_local_content(
         let video = mock_videos.into_iter().find(|v| v.id == id);
         Response::Single(video)
     } else {
-        if let Some(max) = query.max {
-            mock_videos.resize_with(max.min(mock_videos.len()), || unreachable!());
+        if let Some(limit) = query.limit {
+            mock_videos.resize_with(limit.min(mock_videos.len()), || unreachable!());
         }
         Response::Collection(mock_videos)
     };
