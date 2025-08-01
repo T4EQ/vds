@@ -28,7 +28,7 @@ async fn get_content_inner(content_path: &Path, id: &str) -> HttpResponse {
 #[get("/content")]
 async fn get_content(
     content_path: web::Data<PathBuf>,
-    web::Query(query): web::Query<vds_api::api::content::Query>,
+    web::Query(query): web::Query<vds_api::api::content::get::Query>,
 ) -> impl Responder {
     get_content_inner(content_path.get_ref(), &query.id).await
 }

@@ -7,7 +7,7 @@ use vds_api::api::content::local::get::{Response, Video, VideoStatus};
 
 use crate::app::Route;
 
-#[derive(yew::Properties, PartialEq, Eq)]
+#[derive(yew::Properties, PartialEq)]
 pub struct VideoCardProps {
     index: usize,
     video: Video,
