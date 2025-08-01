@@ -22,7 +22,8 @@ pub mod api {
 
                 #[derive(Default, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub struct Query {
-                    pub max: Option<usize>,
+                    pub limit: Option<usize>,
+                    // TODO: add pagination (offset).
                 }
             }
         }
@@ -48,7 +49,8 @@ pub mod api {
                 pub struct Query {
                     pub id: Option<String>,
                     /// Maximum number of results to return
-                    pub max: Option<usize>,
+                    pub limit: Option<usize>,
+                    // TODO: add pagination (offset).
                 }
 
                 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
