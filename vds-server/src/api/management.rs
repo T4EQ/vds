@@ -1,4 +1,8 @@
+use std::sync::LazyLock;
+
 use actix_web::{HttpResponse, Responder, delete, get, put, web};
+
+use vds_api::api::content::local::get::{LocalVideoMeta, Progress, VideoStatus};
 
 #[get("/content/remote")]
 async fn list_remote_content(
@@ -10,55 +14,66 @@ async fn list_remote_content(
     HttpResponse::Ok().json(response)
 }
 
-#[get("/content/local")]
-async fn list_local_content(
-    web::Query(query): web::Query<vds_api::api::content::local::get::Query>,
-) -> impl Responder {
-    use vds_api::api::content::local::get::{Progress, Response, Video, VideoStatus};
-
-    let mut mock_videos = vec![
-        Video {
+static MOCK_VIDEOS: LazyLock<Vec<LocalVideoMeta>> = LazyLock::new(|| {
+    vec![
+        LocalVideoMeta {
             id: "1".to_string(),
             name: "Introduction to Mathematics".to_string(),
             size: 245 * 1024 * 1024,
             status: VideoStatus::Downloaded,
         },
-        Video {
+        LocalVideoMeta {
             id: "2".to_string(),
             name: "Basic Science Concepts".to_string(),
             size: 312 * 1024 * 1024,
             status: VideoStatus::Downloading(Progress(0.5)),
         },
-        Video {
+        LocalVideoMeta {
             id: "3".to_string(),
             name: "English Grammar Fundamentals".to_string(),
             size: 189 * 1024 * 1024,
             status: VideoStatus::Downloaded,
         },
-        Video {
+        LocalVideoMeta {
             id: "4".to_string(),
             name: "History of Ancient Civilizations".to_string(),
             size: 456 * 1024 * 1024,
             status: VideoStatus::Failed,
         },
-        Video {
+        LocalVideoMeta {
             id: "5".to_string(),
             name: "Environmental Science Basics".to_string(),
             size: 378 * 1024 * 1024,
             status: VideoStatus::Downloaded,
         },
-    ];
+    ]
+});
 
-    let response = if let Some(id) = query.id {
-        let video = mock_videos.into_iter().find(|v| v.id == id);
-        Response::Single(video)
-    } else {
+#[get("/content/local")]
+async fn list_local_content(
+    web::Query(query): web::Query<vds_api::api::content::local::get::Query>,
+) -> impl Responder {
+    use vds_api::api::content::local::get::Response;
+
+    let response = {
+        let mut videos = MOCK_VIDEOS.clone();
         if let Some(limit) = query.limit {
-            mock_videos.resize_with(limit.min(mock_videos.len()), || unreachable!());
+            videos.resize_with(limit.min(videos.len()), || unreachable!());
         }
-        Response::Collection(mock_videos)
+        Response { videos }
     };
+    HttpResponse::Ok().json(response)
+}
 
+#[get("/content/local/single")]
+async fn get_local_content_meta(
+    web::Query(query): web::Query<vds_api::api::content::local::single::get::Query>,
+) -> impl Responder {
+    use vds_api::api::content::local::single::get::Response;
+    let response = {
+        let video = MOCK_VIDEOS.iter().find(|v| v.id == query.id).cloned();
+        Response { video }
+    };
     HttpResponse::Ok().json(response)
 }
 

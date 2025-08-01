@@ -3,14 +3,14 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use vds_api::api::content::local::get::{Response, Video, VideoStatus};
+use vds_api::api::content::local::get::{LocalVideoMeta, Response, VideoStatus};
 
 use crate::app::Route;
 
 #[derive(yew::Properties, PartialEq)]
 pub struct VideoCardProps {
     index: usize,
-    video: Video,
+    video: LocalVideoMeta,
 }
 
 #[function_component(VideoCard)]
@@ -52,7 +52,7 @@ pub fn video_card(VideoCardProps { index, video }: &VideoCardProps) -> Html {
     }
 }
 
-async fn fetch_video_content() -> Option<Vec<Video>> {
+async fn fetch_video_content() -> Option<Vec<LocalVideoMeta>> {
     let response = match Request::get("/api/content/local").send().await {
         Ok(v) => v,
         Err(e) => {
@@ -61,7 +61,7 @@ async fn fetch_video_content() -> Option<Vec<Video>> {
         }
     };
 
-    let response_json = match response.json::<Response>().await {
+    let response = match response.json::<Response>().await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Failed to fetch videos. Error decoding json: {e:?}");
@@ -69,18 +69,12 @@ async fn fetch_video_content() -> Option<Vec<Video>> {
         }
     };
 
-    match response_json {
-        Response::Collection(video_list) => Some(video_list),
-        Response::Single(_) => {
-            log::warn!("Unexpected single video response for collection request");
-            None
-        }
-    }
+    Some(response.videos)
 }
 
 #[function_component(VideoList)]
 pub fn video_list() -> Html {
-    let videos: UseStateHandle<Option<Vec<Video>>> = use_state(|| None);
+    let videos: UseStateHandle<Option<Vec<LocalVideoMeta>>> = use_state(|| None);
 
     use_effect_with(videos.clone(), move |vids| {
         if vids.is_none() {

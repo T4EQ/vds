@@ -2,10 +2,10 @@ use gloo_net::http::Request;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use vds_api::api::content::local::get::{Response, Video};
+use vds_api::api::content::local::single::get::{LocalVideoMeta, Response};
 
-async fn fetch_video_content(id: &str) -> Option<Video> {
-    let response = match Request::get("/api/content/local")
+async fn fetch_video_content(id: &str) -> Option<LocalVideoMeta> {
+    let response = match Request::get("/api/content/local/single")
         .query([("id", id)])
         .send()
         .await
@@ -17,7 +17,7 @@ async fn fetch_video_content(id: &str) -> Option<Video> {
         }
     };
 
-    let response_json = match response.json::<Response>().await {
+    let response = match response.json::<Response>().await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Failed to fetch videos. Error decoding json: {e:?}");
@@ -25,13 +25,7 @@ async fn fetch_video_content(id: &str) -> Option<Video> {
         }
     };
 
-    match response_json {
-        Response::Single(video) => video,
-        Response::Collection(_) => {
-            log::warn!("Unexpected collection response for single request");
-            None
-        }
-    }
+    response.video
 }
 
 #[derive(yew::Properties, PartialEq, Eq)]
@@ -41,7 +35,7 @@ pub struct VideoPlayerProps {
 
 #[function_component(VideoPlayer)]
 pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
-    let video: UseStateHandle<Option<Video>> = use_state(|| None);
+    let video: UseStateHandle<Option<LocalVideoMeta>> = use_state(|| None);
 
     use_effect_with((id.to_string(), video.clone()), move |(id, vid)| {
         if vid.is_none() {

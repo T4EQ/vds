@@ -28,29 +28,19 @@
 //!  - `GET` `api/content/{id}`. Obtains the requested content from the server. The path indicates
 //!    the resource ID.
 
+mod types;
+
 pub mod api {
     pub mod content {
         pub mod remote {
             pub mod get {
-
-                /// Metadata of a single video present in the remote server.
-                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, Clone)]
-                pub struct Video {
-                    /// Unique identifier of the video
-                    pub id: String,
-                    /// Human-readable name of the video
-                    pub name: String,
-                    /// Size of the video in bytes
-                    pub size: usize,
-                    /// flag indicating whether the video is also locally cached.
-                    pub local: bool,
-                }
+                pub use crate::types::RemoteVideoMeta;
 
                 /// The response to the `GET` `api/content/remote` request
                 #[derive(Default, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub struct Response {
                     /// List of videos of the remote
-                    pub videos: Vec<Video>,
+                    pub videos: Vec<RemoteVideoMeta>,
                 }
 
                 /// The query that can be used in a `GET` `api/content/remote` request
@@ -64,41 +54,37 @@ pub mod api {
         }
 
         pub mod local {
+            pub mod single {
+                pub mod get {
+                    pub use crate::types::{LocalVideoMeta, Progress, VideoStatus};
+
+                    /// The query that can be used in a `GET` `api/content/local/single` request
+                    #[derive(
+                        Default, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq,
+                    )]
+                    pub struct Query {
+                        /// Unique identifier of the video
+                        pub id: String,
+                        /// Maximum number of videos to list
+                        pub limit: Option<usize>,
+                        // TODO: add pagination (offset).
+                    }
+
+                    /// The response to the `GET` `api/content/local/single` request
+                    #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq)]
+                    pub struct Response {
+                        /// Video metadata, if found
+                        pub video: Option<LocalVideoMeta>,
+                    }
+                }
+            }
+
             pub mod get {
-                /// Download progress. A number from 0 to 1, where 1 indicates completed and 0 not
-                /// started.
-                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Clone)]
-                pub struct Progress(pub f64);
-
-                /// The status of the video download
-                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Clone)]
-                pub enum VideoStatus {
-                    /// The video download is in progress
-                    Downloading(Progress),
-                    /// The video download is completed
-                    Downloaded,
-                    /// The video download failed
-                    Failed,
-                }
-
-                /// Metadata of a single video of the local server.
-                #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Clone)]
-                pub struct Video {
-                    /// Unique identifier of the video
-                    pub id: String,
-                    /// Human-readable name of the video
-                    pub name: String,
-                    /// Size of the video in bytes
-                    pub size: usize,
-                    /// Download status
-                    pub status: VideoStatus,
-                }
+                pub use crate::types::{LocalVideoMeta, Progress, VideoStatus};
 
                 /// The query that can be used in a `GET` `api/content/local` request
                 #[derive(Default, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
                 pub struct Query {
-                    /// Optionally, we can ask for a single result, if we know the ID.
-                    pub id: Option<String>,
                     /// Maximum number of videos to list
                     pub limit: Option<usize>,
                     // TODO: add pagination (offset).
@@ -106,11 +92,9 @@ pub mod api {
 
                 /// The response to the `GET` `api/content/local` request
                 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq)]
-                pub enum Response {
-                    /// Response to a request to list a specific video (if `id` was given in the request).
-                    Single(Option<Video>),
-                    /// Response to a request to list all videos (if `id` was not given in the request).
-                    Collection(Vec<Video>),
+                pub struct Response {
+                    /// Locally cached content
+                    pub videos: Vec<LocalVideoMeta>,
                 }
             }
 
