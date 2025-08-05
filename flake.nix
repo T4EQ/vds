@@ -3,11 +3,16 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
     {
       nixpkgs,
+      rust-overlay,
       ...
     }:
     let
@@ -22,30 +27,44 @@
         nixpkgs.lib.genAttrs systems (
           system:
           let
-            pkgs = import nixpkgs { inherit system; };
+            overlays = [ (import rust-overlay) ];
+            pkgs = import nixpkgs { inherit system overlays; };
           in
           fn pkgs
         );
     in
     {
-      packages = forEachSystem (pkgs: rec {
-        vds = pkgs.rustPlatform.buildRustPackage {
-          pname = "vds";
-          version = "0.1.0";
-          src = ./.;
+      packages = forEachSystem (
+        pkgs:
+        let
+          rustPlatform = pkgs.makeRustPlatform (
+            let
+              toolchain = (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml);
+            in
+            {
+              rustc = toolchain;
+              cargo = toolchain;
+            }
+          );
+        in
+        rec {
+          vds = rustPlatform.buildRustPackage {
+            pname = "vds";
+            version = "0.1.0";
+            src = ./.;
 
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-          };
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+            };
 
-          nativeBuildInputs = [
-            pkgs.trunk
-            pkgs.wasm-bindgen-cli
-            pkgs.dart-sass
-            pkgs.lld
-          ];
+            nativeBuildInputs = [
+              pkgs.trunk
+              pkgs.wasm-bindgen-cli
+              pkgs.dart-sass
+              pkgs.lld
+            ];
 
-          buildPhase = "
+            buildPhase = "
             runHook preBuild
 
             # Let stdenv handle stripping, for consistency and to not break
@@ -58,16 +77,16 @@
 
             echo Finished cargo build
           ";
-        };
+          };
 
-        default = vds;
-      });
+          default = vds;
+        }
+      );
 
       devShells = forEachSystem (pkgs: rec {
         vds = pkgs.mkShell {
           nativeBuildInputs = [
-            pkgs.cargo
-            pkgs.rustc
+            (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
             pkgs.trunk
             pkgs.wasm-bindgen-cli
             pkgs.dart-sass
