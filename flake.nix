@@ -33,7 +33,7 @@
           fn pkgs
         );
     in
-    {
+    rec {
       packages = forEachSystem (
         pkgs:
         let
@@ -82,6 +82,11 @@
           default = vds;
         }
       );
+
+      # Much older versions of nix (from around 2022) used a different attribute to mark the default package.
+      # This is included for compatibility with those versions.
+      # See https://wiki.nixos.org/w/index.php?title=Flakes&oldid=7960#Output_schema
+      defaultPackage = forEachSystem (pkgs: packages."${pkgs.system}".default);
 
       devShells = forEachSystem (pkgs: rec {
         vds = pkgs.mkShell {
