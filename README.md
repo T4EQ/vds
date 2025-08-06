@@ -66,7 +66,7 @@ To build the web server simply run:
 cargo b
 
 # Build in release mode:
-cargo b
+cargo br
 ```
 
 Note that `b` and `br` are cargo aliases defined in `.cargo/config.toml`. These aliases invoke `xtask` 
