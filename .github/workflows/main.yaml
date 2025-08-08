@@ -1,0 +1,75 @@
+name: "Build and test"
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  nix-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: cachix/install-nix-action@v31
+      with:
+        github_access_token: ${{ secrets.GITHUB_TOKEN }}
+        nix_path: nixpkgs=channel:nixos-unstable
+    - run: nix build
+    - run: nix flake check
+
+  cargo_clippy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: 'Install rust-toolchain.toml'
+      run: rustup toolchain install
+    - run: cargo clippy
+
+  cargo_build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: 'Install rust-toolchain.toml'
+      run: rustup toolchain install
+    - uses: cargo-bins/cargo-binstall@main
+    - run: cargo binstall trunk
+    - run: cargo br
+
+  cargo_test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: 'Install rust-toolchain.toml'
+      run: rustup toolchain install
+    - run: cargo test
+
+  cargo_fmt:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: 'Install rust-toolchain.toml'
+      run: rustup toolchain install
+    - run: cargo fmt --check
+
+  cargo_doc:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: 'Install rust-toolchain.toml'
+      run: rustup toolchain install
+    - run: cargo doc
+
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: EmbarkStudios/cargo-deny-action@v2
