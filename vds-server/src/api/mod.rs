@@ -10,6 +10,7 @@ pub fn register_handlers(app: &mut web::ServiceConfig) {
             .service(management::list_local_content)
             .service(management::delete_local_content)
             .service(management::cache_content)
+            .service(management::get_local_content_meta)
             .service(user::get_content)
             .service(user::get_content_path),
     );
