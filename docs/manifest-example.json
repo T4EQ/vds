@@ -1,0 +1,41 @@
+{
+    "name": "High school video distribution list",
+    "date": "2025-10-10",
+    "sections": [
+        {
+            "name": "Equations",
+            "content": [
+                {
+                    "name": "Linear equations",
+                    "id": "bf978778-1c5d-44b3-b2c1-1cc253563799",
+                    "uri": "s3://bucket/linear-equations.mp4"
+                },
+                {
+                    "name": "Quadratic equations",
+                    "id": "5eb9e089-79cf-478d-9121-9ca3e7bb1d4a",
+                    "uri": "s3://bucket/quadratic-equations.mp4"
+                },
+                {
+                    "name": "Cubic equations",
+                    "id": "9e0f44b6-3dc6-4f56-8c9f-7e28feac1d03",
+                    "uri": "s3://bucket/cubic-equations.mp4"
+                }
+            ]
+        },
+        {
+            "name": "Integration",
+            "content": [
+                {
+                    "name": "Riemann sum",
+                    "id": "eddb4450-a9ff-4a4b-ad81-2a8b78998405",
+                    "uri": "s3://bucket/riemann-sum.mp4"
+                },
+                {
+                    "name": "List of integrals",
+                    "id": "f47e6cdc-1bcf-439a-9ea4-038dc7153648",
+                    "uri": "s3://bucket/list-of-integrals.mp4"
+                }
+            ]
+        }
+    ]
+}
