@@ -55,6 +55,11 @@
             "description": "The name of the current content distribution schema. e.g.: \"High School distribution list\".",
             "type": "string"
         },
+        "version": {
+            "description": "The version of the manifest file. Different versions use different schemas.",
+            "type": "string",
+            "pattern": "v[0-9]+\\.[0-9]+\\.[0-9]+"
+        },
         "date": {
             "description": "Date of deployment of the manifest.",
             "type": "string",
