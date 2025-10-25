@@ -3,7 +3,7 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use vds_api::api::content::local::get::{LocalVideoMeta, Response, VideoStatus};
+use vds_api::api::content::meta::get::{LocalVideoMeta, Response, VideoStatus};
 
 use crate::app::Route;
 
@@ -53,10 +53,10 @@ pub fn video_card(VideoCardProps { index, video }: &VideoCardProps) -> Html {
 }
 
 async fn fetch_video_content() -> Option<Vec<LocalVideoMeta>> {
-    let response = match Request::get("/api/content/local").send().await {
+    let response = match Request::get("/api/content/meta").send().await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("Failed to fetch videos. Error performing HTTP request: {e:?}");
+            log::error!("Failed to fetch content meta. Error performing HTTP request: {e:?}");
             return None;
         }
     };
