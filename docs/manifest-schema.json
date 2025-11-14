@@ -45,7 +45,7 @@
                     "description": "The SHA-256 hash of the video file."
                 }
             },
-            "required": ["id", "name", "uri"]
+            "required": ["id", "name", "uri", "sha256"]
         }
     },
 
@@ -74,5 +74,5 @@
             "uniqueItems": true
         }
     },
-    "required": ["name", "sections", "date"]
+    "required": ["name", "sections", "date", "version"]
 }
