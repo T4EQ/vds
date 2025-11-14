@@ -2455,6 +2455,7 @@ dependencies = [
  "clap",
  "diesel",
  "googletest",
+ "http",
  "serde",
  "serde_json",
  "static-files",
