@@ -8,12 +8,18 @@ license = "MIT OR Apache-2.0"
 actix-web-static-files.workspace = true
 actix-web.workspace = true
 anyhow.workspace = true
+chrono.workspace = true
 clap.workspace = true
 diesel.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 static-files.workspace = true
 tokio.workspace = true
+uuid.workspace = true
 vds-api.path = "../vds-api"
+
+[dev-dependencies]
+googletest.workspace = true
 
 [build-dependencies]
 static-files.workspace = true

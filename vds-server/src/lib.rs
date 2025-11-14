@@ -3,6 +3,7 @@ use actix_web::{App, HttpServer, dev::Server, web};
 use std::{net::TcpListener, path::Path};
 
 mod api;
+mod manifest;
 mod static_files;
 
 pub fn run_app(listener: TcpListener, content_path: &Path) -> anyhow::Result<Server> {
