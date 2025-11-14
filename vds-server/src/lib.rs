@@ -3,10 +3,11 @@ use actix_web::{App, HttpServer, dev::Server, web};
 use std::{net::TcpListener, path::Path};
 
 mod api;
+mod downloader;
 mod manifest;
 mod static_files;
 
-pub fn run_app(listener: TcpListener, content_path: &Path) -> anyhow::Result<Server> {
+pub fn create_server(listener: TcpListener, content_path: &Path) -> anyhow::Result<Server> {
     let content_path = web::Data::new(content_path.to_owned());
     Ok(HttpServer::new(move || {
         App::new()
@@ -16,4 +17,8 @@ pub fn run_app(listener: TcpListener, content_path: &Path) -> anyhow::Result<Ser
     })
     .listen(listener)?
     .run())
+}
+
+pub async fn create_downloader(content_path: &Path) -> anyhow::Result<()> {
+    Ok(downloader::downloader_task(content_path).await?)
 }

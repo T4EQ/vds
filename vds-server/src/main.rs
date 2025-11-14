@@ -19,6 +19,10 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let listener = TcpListener::bind(format!("{}:{}", args.listen_address, args.port))?;
     println!("Listening on {}", listener.local_addr()?);
-    vds_server::run_app(listener, &args.content_path)?.await?;
+
+    let server = vds_server::create_server(listener, &args.content_path)?;
+    let downloader = vds_server::create_downloader(&args.content_path);
+    tokio::try_join!(downloader, async { Ok(server.await?) })?;
+
     Ok(())
 }

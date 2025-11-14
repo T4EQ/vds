@@ -1,28 +1,53 @@
+/// Version data type made of major, minor and revision numbers.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Version(u32, u32, u32);
+pub struct Version {
+    pub major: u32,
+    pub minor: u32,
+    pub revision: u32,
+}
 
+/// Metadata for a single video entry
 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 pub struct Video {
-    name: String,
-    id: uuid::Uuid,
+    /// Human-readable name of the video
+    pub name: String,
+
+    /// Unique identifier of the video
+    pub id: uuid::Uuid,
+
+    /// Unique resource identifier from which the video can be downloaded
     #[serde(deserialize_with = "deserialize_uri")]
     #[serde(serialize_with = "serialize_uri")]
-    uri: http::Uri,
-    sha256: String,
+    pub uri: http::Uri,
+
+    /// SHA-256 of the video file
+    pub sha256: String,
 }
 
+/// A section of content that groups together a number of videos
 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 pub struct Section {
-    name: String,
-    content: Vec<Video>,
+    /// Name of the section
+    pub name: String,
+
+    /// Content within the section. Ordered as displayed
+    pub content: Vec<Video>,
 }
 
+/// Describes the set of videos and sections to be shown in the VDS.
 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
 pub struct ManifestFile {
-    name: String,
-    date: chrono::NaiveDate,
-    version: Version,
-    sections: Vec<Section>,
+    /// Name of the distribution list
+    pub name: String,
+
+    /// Date in which this manifest was released
+    pub date: chrono::NaiveDate,
+
+    /// Version of the manifest. At the moment only version 1.0.0 is supported
+    pub version: Version,
+
+    /// Sections in the manifest. Ordered as displayed
+    pub sections: Vec<Section>,
 }
 
 fn serialize_uri<S>(uri: &http::Uri, serializer: S) -> Result<S::Ok, S::Error>
@@ -54,7 +79,7 @@ impl serde::Serialize for Version {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&format!("v{}.{}.{}", self.0, self.1, self.2))
+        serializer.serialize_str(&format!("v{}.{}.{}", self.major, self.minor, self.revision))
     }
 }
 
@@ -104,7 +129,11 @@ mod version {
                 return Err(E::custom("Invalid version string."));
             }
 
-            Ok(super::Version(components[0], components[1], components[2]))
+            Ok(super::Version {
+                major: components[0],
+                minor: components[1],
+                revision: components[2],
+            })
         }
     }
 }
@@ -116,12 +145,20 @@ pub mod test {
     use super::*;
     use googletest::prelude::*;
 
+    pub fn new_version(major: u32, minor: u32, revision: u32) -> Version {
+        Version {
+            major,
+            minor,
+            revision,
+        }
+    }
+
     #[googletest::gtest]
     fn deserialize_version() -> googletest::Result<()> {
         let version = serde_json::from_str::<Version>(r#""v1.2.3""#).or_fail()?;
-        expect_that!(version, eq(&Version(1, 2, 3)));
+        expect_that!(version, eq(&new_version(1, 2, 3)));
         let version = serde_json::from_str::<Version>(r#""v432.224.8234""#).or_fail()?;
-        expect_that!(version, eq(&Version(432, 224, 8234)));
+        expect_that!(version, eq(&new_version(432, 224, 8234)));
 
         Ok(())
     }
@@ -151,7 +188,7 @@ pub mod test {
     #[googletest::gtest]
     fn serialize_version() -> googletest::Result<()> {
         let expected = r#""v1.2.3""#;
-        let version = serde_json::to_string(&Version(1, 2, 3)).or_fail()?;
+        let version = serde_json::to_string(&new_version(1, 2, 3)).or_fail()?;
         expect_that!(version, eq(expected));
         Ok(())
     }
@@ -297,7 +334,7 @@ pub mod test {
             eq(&ManifestFile {
                 name: "High school video distribution list".to_string(),
                 date: chrono::NaiveDate::from_str("2025-10-10").or_fail()?,
-                version: Version(1, 0, 0),
+                version: new_version(1, 0, 0),
                 sections: vec![
                     Section {
                         name: "Equations".to_string(),
