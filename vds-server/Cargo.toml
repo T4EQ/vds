@@ -11,6 +11,7 @@ anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
 diesel.workspace = true
+http.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 static-files.workspace = true
