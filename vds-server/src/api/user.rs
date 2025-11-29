@@ -1,7 +1,4 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::LazyLock,
-};
+use std::{path::PathBuf, sync::LazyLock};
 
 use actix_web::{HttpResponse, Responder, get, post, web};
 use tokio::io::AsyncReadExt;
@@ -61,7 +58,7 @@ async fn list_content_metadata(
 
 #[get("/content/meta/{id}")]
 async fn content_metadata_for_id(id: web::Path<String>) -> impl Responder {
-    use vds_api::api::content::meta::single::get::Response;
+    use vds_api::api::content::meta::id::get::Response;
 
     let response = Response {
         meta: MOCK_VIDEOS.iter().find(|v| v.id == *id).cloned(),
@@ -69,8 +66,9 @@ async fn content_metadata_for_id(id: web::Path<String>) -> impl Responder {
     HttpResponse::Ok().json(response)
 }
 
-async fn get_content_inner(content_path: &Path, id: &str) -> HttpResponse {
-    let mut filepath = content_path.join(id);
+#[get("/content/{id}")]
+async fn get_content(content_path: web::Data<PathBuf>, id: web::Path<String>) -> impl Responder {
+    let mut filepath = content_path.join(id.into_inner());
     filepath.set_extension("mp4");
 
     let mut file = match tokio::fs::File::open(filepath).await {
@@ -92,13 +90,9 @@ async fn get_content_inner(content_path: &Path, id: &str) -> HttpResponse {
     HttpResponse::Ok().content_type("video/mp4").body(data)
 }
 
-#[get("/content/{id}")]
-async fn get_content(content_path: web::Data<PathBuf>, id: web::Path<String>) -> impl Responder {
-    get_content_inner(content_path.get_ref(), &id).await
-}
-
 #[get("/manifest/latest")]
 async fn get_manifest() -> impl Responder {
+    // FIXME: Do not use a hardcoded manifest
     let manifest_file = include_str!("../../../docs/manifest-example.json");
     HttpResponse::Ok()
         .content_type("application/json")
@@ -107,6 +101,6 @@ async fn get_manifest() -> impl Responder {
 
 #[post("/manifest/fetch")]
 async fn fetch_manifest() -> impl Responder {
-    // TODO
+    // TODO: Implement
     HttpResponse::Ok()
 }

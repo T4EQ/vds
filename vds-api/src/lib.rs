@@ -10,14 +10,12 @@
 //!   - If the endpoint returns a JSON body, a `Response` type defines its contents.
 //!   - Any additional types required to define either the query or the response.
 //!
-//! The following terminology is used in the VDS:
-//! - `local` refers to content local to the VDS server.
-//!
 //! The supported endpoints are:
 //!  - `POST` `api/manifest/fetch`. Triggers an immediate fetch of the manifest, causing the VDS to
 //!    update its cached content.
 //!  - `GET` `api/manifest/latest`. Returns the latest manifest that is in use by the VDS.
-//!  - `GET` `api/content/meta`. Returns a list of the content in the local server (VDS).
+//!  - `GET` `api/content/meta`. Returns a list of the content metadata in the local server (VDS).
+//!  - `GET` `api/content/meta/{id}`. Returns the metadata of the requested id.
 //!  - `GET` `api/content/{id}`. Obtains the requested content from the server. The path indicates
 //!    the resource ID.
 
@@ -44,11 +42,11 @@ pub mod api {
                 }
             }
 
-            pub mod single {
+            pub mod id {
                 pub mod get {
                     pub use crate::types::{LocalVideoMeta, Progress, VideoStatus};
 
-                    /// The response to the `GET` `api/content/meta/single/{id}` request
+                    /// The response to the `GET` `api/content/meta/{id}` request
                     #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq)]
                     pub struct Response {
                         pub meta: Option<LocalVideoMeta>,
