@@ -2,28 +2,24 @@ use gloo_net::http::Request;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use vds_api::api::content::meta::single::get::{LocalVideoMeta, Response};
+use vds_api::api::content::meta::id::get::{LocalVideoMeta, Response};
 
 async fn fetch_video_content(id: &str) -> Option<LocalVideoMeta> {
-    let response = match Request::get("/api/content/meta/single")
-        .query([("id", id)])
+    let response = Request::get(&format!("/api/content/meta/{id}"))
         .send()
         .await
-    {
-        Ok(v) => v,
-        Err(e) => {
+        .inspect_err(|e| {
             log::error!("Failed to fetch videos. Error performing HTTP request: {e:?}");
-            return None;
-        }
-    };
+        })
+        .ok()?;
 
-    let response = match response.json::<Response>().await {
-        Ok(v) => v,
-        Err(e) => {
+    let response = response
+        .json::<Response>()
+        .await
+        .inspect_err(|e| {
             log::error!("Failed to fetch videos. Error decoding json: {e:?}");
-            return None;
-        }
-    };
+        })
+        .ok()?;
 
     response.meta
 }
