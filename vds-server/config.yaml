@@ -1,0 +1,5 @@
+server_settings:
+  listen_address: 127.0.0.1
+  port: 8080
+content_path: "/home/javier/Documents/vds_content"
+debug_file_server: "/home/javier/Documents/vds_server"

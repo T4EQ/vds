@@ -3,6 +3,7 @@ use actix_web::{App, HttpServer, dev::Server, web};
 use std::{net::TcpListener, path::Path};
 
 mod api;
+pub mod configuration;
 mod downloader;
 mod manifest;
 mod static_files;
@@ -20,5 +21,5 @@ pub fn create_server(listener: TcpListener, content_path: &Path) -> anyhow::Resu
 }
 
 pub async fn create_downloader(content_path: &Path) -> anyhow::Result<()> {
-    Ok(downloader::downloader_task(content_path).await?)
+    downloader::downloader_task(content_path).await
 }

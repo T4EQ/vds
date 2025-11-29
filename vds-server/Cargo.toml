@@ -11,6 +11,7 @@ anyhow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 clap.workspace = true
+config.workspace = true
 diesel.workspace = true
 http.workspace = true
 regex.workspace = true

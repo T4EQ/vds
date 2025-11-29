@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::manifest::ManifestFile;
 use backend::FileBackend;
 
@@ -57,8 +59,7 @@ impl Downloader {
         }
 
         // All fetched!
-
-        todo!();
+        Ok(())
     }
 }
 
@@ -71,5 +72,8 @@ pub async fn downloader_task(base_path: &std::path::Path) -> anyhow::Result<()> 
 
     loop {
         downloader.update(&backend).await?;
+
+        // Do this every second
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }
