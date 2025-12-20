@@ -8,7 +8,7 @@ pub struct Version {
     pub revision: u32,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Sha256(String);
 
 impl Deref for Sha256 {
@@ -19,7 +19,7 @@ impl Deref for Sha256 {
 }
 
 /// Metadata for a single video entry
-#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, Clone)]
 pub struct Video {
     /// Human-readable name of the video
     pub name: String,
