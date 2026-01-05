@@ -3,6 +3,7 @@ use actix_web::{App, HttpServer, dev::Server, web};
 use std::{net::TcpListener, path::Path};
 
 mod api;
+mod db;
 mod manifest;
 mod static_files;
 

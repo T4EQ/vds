@@ -97,6 +97,7 @@
             pkgs.dart-sass
             pkgs.cargo-watch
             pkgs.cargo-deny
+            pkgs.diesel-cli
           ];
         };
 
