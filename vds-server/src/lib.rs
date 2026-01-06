@@ -1,14 +1,18 @@
 use actix_web::{App, HttpServer, dev::Server, web};
 
-use std::{net::TcpListener, path::Path};
+use std::net::TcpListener;
+
+pub mod cfg;
 
 mod api;
 mod db;
 mod manifest;
 mod static_files;
 
-pub fn run_app(listener: TcpListener, content_path: &Path) -> anyhow::Result<Server> {
-    let content_path = web::Data::new(content_path.to_owned());
+use cfg::VdsConfig;
+
+pub fn run_app(listener: TcpListener, config: VdsConfig) -> anyhow::Result<Server> {
+    let content_path = web::Data::new(config);
     Ok(HttpServer::new(move || {
         App::new()
             .app_data(content_path.clone())

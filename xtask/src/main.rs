@@ -67,7 +67,7 @@ fn run(args: &RunArgs) -> anyhow::Result<()> {
     let shell = xshell::Shell::new()?;
     cmd!(
         shell,
-        "cargo run {release...} --bin vds-server -- --content-path video-data"
+        "cargo run {release...} --bin vds-server -- --config ./docs/vds_config_template.toml"
     )
     .run()?;
 

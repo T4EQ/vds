@@ -1,0 +1,7 @@
+debug = true
+runtime_path = "/tmp/vds/runtime_path"
+remote_server = "/tmp/vds/remote_server"
+
+[http_config]
+listen_address = "127.0.0.1"
+listen_port = 8080

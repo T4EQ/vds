@@ -10,6 +10,7 @@ actix-web.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
+config.workspace = true
 deadpool-diesel.workspace = true
 diesel.workspace = true
 diesel_migrations.workspace = true
