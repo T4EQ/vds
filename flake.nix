@@ -2,7 +2,7 @@
   description = "Video Delivery System";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -59,7 +59,7 @@
 
             nativeBuildInputs = [
               pkgs.trunk
-              pkgs.wasm-bindgen-cli
+              pkgs.wasm-bindgen-cli_0_2_106
               pkgs.dart-sass
               pkgs.lld
             ];
@@ -93,7 +93,7 @@
           nativeBuildInputs = [
             (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
             pkgs.trunk
-            pkgs.wasm-bindgen-cli
+            pkgs.wasm-bindgen-cli_0_2_106
             pkgs.dart-sass
             pkgs.cargo-watch
             pkgs.cargo-deny
