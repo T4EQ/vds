@@ -4,21 +4,26 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long, default_value = "127.0.0.1")]
-    listen_address: String,
-
-    #[arg(short, long, default_value = "8080")]
-    port: u16,
-
+    /// Path to the VDS configuration
     #[arg(short, long)]
-    content_path: PathBuf,
+    config: Option<PathBuf>,
+}
+
+fn default_config_path() -> PathBuf {
+    "/var/lib/vds/config/config.toml".into()
 }
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    let listener = TcpListener::bind(format!("{}:{}", args.listen_address, args.port))?;
+    let config = vds_server::cfg::get_config(&args.config.unwrap_or_else(default_config_path))?;
+
+    let listener = TcpListener::bind(format!(
+        "{}:{}",
+        config.http_config.listen_address, config.http_config.listen_port
+    ))?;
     println!("Listening on {}", listener.local_addr()?);
-    vds_server::run_app(listener, &args.content_path)?.await?;
+    vds_server::run_app(listener, config)?.await?;
+
     Ok(())
 }
