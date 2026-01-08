@@ -1,13 +1,15 @@
+use std::{ffi::OsString, os::unix::ffi::OsStringExt, path::PathBuf};
+
 use diesel::prelude::*;
 
 use super::schema;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DownloadStatus {
-    NotStarted,
+    Pending,
     Failed(String),
     InProgress((u64, u64)),
-    Downloaded,
+    Downloaded(PathBuf),
 }
 
 pub const DOWNLOAD_STATUS_NOT_STARTED: i64 = 0;
@@ -28,12 +30,14 @@ impl TryFrom<VideoInner> for Video {
     type Error = super::Error;
     fn try_from(value: VideoInner) -> Result<Self, super::Error> {
         let download_status = match value.download_status {
-            DOWNLOAD_STATUS_NOT_STARTED => DownloadStatus::NotStarted,
+            DOWNLOAD_STATUS_NOT_STARTED => DownloadStatus::Pending,
             DOWNLOAD_STATUS_FAILED => DownloadStatus::Failed(value.message),
             DOWNLOAD_STATUS_IN_PROGRESS => {
                 DownloadStatus::InProgress((value.downloaded_size as u64, value.file_size as u64))
             }
-            DOWNLOAD_STATUS_DOWNLOADED => DownloadStatus::Downloaded,
+            DOWNLOAD_STATUS_DOWNLOADED => {
+                DownloadStatus::Downloaded(OsString::from_vec(value.file_path).into())
+            }
             v => {
                 return Err(super::Error::InvalidDownloadStatus(v));
             }
@@ -59,6 +63,7 @@ pub struct VideoInner {
     pub download_status: i64,
     pub view_count: i64,
     pub message: String,
+    pub file_path: Vec<u8>,
 }
 
 #[derive(Insertable)]

@@ -5,5 +5,6 @@ CREATE TABLE videos (
     downloaded_size BIG INT NOT NULL DEFAULT 0,
     download_status BIG INT NOT NULL DEFAULT 0,
     view_count BIG INT NOT NULL DEFAULT 0,
-    message VARCHAR NOT NULL DEFAULT ''
+    message VARCHAR NOT NULL DEFAULT '',
+    file_path BLOB NOT NULL DEFAULT ''
 )

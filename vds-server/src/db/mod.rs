@@ -1,14 +1,17 @@
 mod models;
 mod schema;
 
+use std::path::Path;
 use std::time::Duration;
 
 pub use models::{DownloadStatus, Video};
 
-use deadpool_diesel::{Manager, Pool, Timeouts};
+use deadpool_diesel::{Manager, Pool};
 use diesel::{connection::SimpleConnection, prelude::*};
 
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+
+use crate::db::models::VideoInner;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
@@ -18,8 +21,6 @@ pub enum Error {
     Pool(#[from] deadpool_diesel::PoolError),
     #[error("Build error: {0:?}")]
     Build(#[from] deadpool_diesel::sqlite::BuildError),
-    #[error("Interact error: {0:?}")]
-    Interact(#[from] deadpool_diesel::sqlite::InteractError),
     #[error("Diesel error: {0:?}")]
     Diesel(#[from] diesel::result::Error),
     #[error("Migration error")]
@@ -42,14 +43,14 @@ impl Database {
         let pool: Pool<Manager<_>> = Pool::builder(manager)
             .max_size(16)
             .post_create(deadpool_diesel::sqlite::Hook::sync_fn(move |c, _m| {
-                let mut c = c.lock().unwrap();
+                let mut c = c.lock().expect("poisoned mutex");
                 c.batch_execute("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")
-                    .expect("Unable to configure journal mode on sqlite db");
+                    .expect("Unable to configure journal mode on sqlite DB connection");
                 c.batch_execute(&format!(
                     "PRAGMA busy_timeout = {};",
                     timeout_ms.as_millis()
                 ))
-                .expect("Unable to set busy timeout");
+                .expect("Unable to set busy timeout on DB connection");
                 Ok(())
             }))
             .build()?;
@@ -65,7 +66,8 @@ impl Database {
                     .map_err(|_| Error::Migration)?;
                 Ok(())
             })
-            .await?
+            .await
+            .expect("Unexpected panic of a background DB thread")
     }
 
     pub async fn find_video(&self, req_id: uuid::Uuid) -> Result<Video> {
@@ -82,7 +84,8 @@ impl Database {
                     .get_result(conn)?;
                 video.try_into()
             })
-            .await?
+            .await
+            .expect("Unexpected panic of a background DB thread")
     }
 
     pub async fn delete_video(&self, req_id: uuid::Uuid) -> Result<()> {
@@ -96,7 +99,8 @@ impl Database {
                 diesel::delete(videos.filter(id.eq(req_id))).execute(c)?;
                 Ok(())
             })
-            .await?
+            .await
+            .expect("Unexpected panic of a background DB thread")
     }
 
     pub async fn insert_video(&self, id: uuid::Uuid, name: &str, file_size: u64) -> Result<()> {
@@ -115,20 +119,22 @@ impl Database {
                     .execute(c)?;
                 Ok(())
             })
-            .await?
+            .await
+            .expect("Unexpected panic of a background DB thread")
     }
 
-    pub async fn increment_view_count(&self, req_id: uuid::Uuid) -> Result<()> {
+    pub async fn increment_view_count(&self, req_id: uuid::Uuid) -> Result<Video> {
         let connection = self.pool.get().await?;
         connection
-            .interact(move |c| {
+            .interact(move |c| -> Result<Video> {
                 use schema::videos::dsl;
-                diesel::update(dsl::videos.find(req_id.to_string()))
+                let v: VideoInner = diesel::update(dsl::videos.find(req_id.to_string()))
                     .set((dsl::view_count.eq(dsl::view_count + 1),))
-                    .execute(c)?;
-                Ok(())
+                    .get_result(c)?;
+                v.try_into()
             })
-            .await?
+            .await
+            .expect("Unexpected panic of a background DB thread")
     }
 
     pub async fn update_download_progress(
@@ -149,7 +155,8 @@ impl Database {
                     .execute(c)?;
                 Ok(())
             })
-            .await?
+            .await
+            .expect("Unexpected panic of a background DB thread")
     }
 
     pub async fn set_download_failed(&self, req_id: uuid::Uuid, message: &str) -> Result<()> {
@@ -168,10 +175,14 @@ impl Database {
                     .execute(c)?;
                 Ok(())
             })
-            .await?
+            .await
+            .expect("Unexpected panic of a background DB thread")
     }
 
-    pub async fn set_downloaded(&self, req_id: uuid::Uuid) -> Result<()> {
+    pub async fn set_downloaded(&self, req_id: uuid::Uuid, file_path: &Path) -> Result<()> {
+        let file_path = file_path.as_os_str().to_owned(); // Need a copy since interact runs on a separate thread
+        // and requires 'static.
+
         let connection = self.pool.get().await?;
         connection
             .interact(move |c| {
@@ -181,11 +192,13 @@ impl Database {
                         dsl::download_status.eq(models::DOWNLOAD_STATUS_DOWNLOADED),
                         dsl::downloaded_size.eq(dsl::file_size),
                         dsl::message.eq(""),
+                        dsl::file_path.eq(file_path.as_encoded_bytes()),
                     ))
                     .execute(c)?;
                 Ok(())
             })
-            .await?
+            .await
+            .expect("Unexpected panic of a background DB thread")
     }
 }
 
@@ -195,6 +208,7 @@ mod test {
 
     use core::str::FromStr;
     use googletest::prelude::*;
+    use std::path::PathBuf;
     use tempfile::NamedTempFile;
 
     #[tokio::test]
@@ -224,7 +238,7 @@ mod test {
                 id: uuid,
                 name: "my video".to_string(),
                 file_size: 1234567,
-                download_status: DownloadStatus::NotStarted,
+                download_status: DownloadStatus::Pending,
                 view_count: 0
             })
         );
@@ -263,7 +277,7 @@ mod test {
                 id: uuid,
                 name: "my video".to_string(),
                 file_size: 1234567,
-                download_status: DownloadStatus::NotStarted,
+                download_status: DownloadStatus::Pending,
                 view_count: 3
             })
         );
@@ -322,7 +336,8 @@ mod test {
         db.apply_pending_migrations().await.or_fail()?;
         db.insert_video(uuid, "my video", 1234567).await.or_fail()?;
 
-        db.set_downloaded(uuid).await?;
+        let pathbuf: PathBuf = "/path/to/the/file.mp4".into();
+        db.set_downloaded(uuid, &pathbuf).await?;
 
         let video = db.find_video(uuid).await.or_fail()?;
         expect_that!(
@@ -331,7 +346,7 @@ mod test {
                 id: uuid,
                 name: "my video".to_string(),
                 file_size: 1234567,
-                download_status: DownloadStatus::Downloaded,
+                download_status: DownloadStatus::Downloaded("/path/to/the/file.mp4".into()),
                 view_count: 0
             })
         );

@@ -1,9 +1,35 @@
-use std::{path::PathBuf, sync::LazyLock};
+use std::sync::LazyLock;
 
 use actix_web::{HttpResponse, Responder, get, post, web};
 use tokio::io::AsyncReadExt;
 
 use vds_api::api::content::meta::get::{LocalVideoMeta, Progress, VideoStatus};
+
+use crate::db::Database;
+
+impl From<crate::db::DownloadStatus> for VideoStatus {
+    fn from(value: crate::db::DownloadStatus) -> Self {
+        match value {
+            crate::db::DownloadStatus::Pending => VideoStatus::Pending,
+            crate::db::DownloadStatus::InProgress((completed, total)) => {
+                VideoStatus::Downloading(Progress(completed as f64 / total as f64))
+            }
+            crate::db::DownloadStatus::Downloaded(_) => VideoStatus::Downloaded,
+            crate::db::DownloadStatus::Failed(msg) => VideoStatus::Failed(msg),
+        }
+    }
+}
+
+impl From<crate::db::Video> for LocalVideoMeta {
+    fn from(value: crate::db::Video) -> Self {
+        LocalVideoMeta {
+            id: value.id.to_string(),
+            name: value.name,
+            size: value.file_size as usize,
+            status: value.download_status.into(),
+        }
+    }
+}
 
 static MOCK_VIDEOS: LazyLock<Vec<LocalVideoMeta>> = LazyLock::new(|| {
     vec![
@@ -29,7 +55,7 @@ static MOCK_VIDEOS: LazyLock<Vec<LocalVideoMeta>> = LazyLock::new(|| {
             id: "4".to_string(),
             name: "History of Ancient Civilizations".to_string(),
             size: 456 * 1024 * 1024,
-            status: VideoStatus::Failed,
+            status: VideoStatus::Failed("Because of reasons".to_string()),
         },
         LocalVideoMeta {
             id: "5".to_string(),
@@ -57,19 +83,40 @@ async fn list_content_metadata(
 }
 
 #[get("/content/meta/{id}")]
-async fn content_metadata_for_id(id: web::Path<String>) -> impl Responder {
+async fn content_metadata_for_id(
+    database: web::Data<Database>,
+    id: web::Path<String>,
+) -> impl Responder {
     use vds_api::api::content::meta::id::get::Response;
-
-    let response = Response {
-        meta: MOCK_VIDEOS.iter().find(|v| v.id == *id).cloned(),
+    let Ok(id) = id.into_inner().try_into() else {
+        return HttpResponse::BadRequest().body("Invalid video ID");
     };
-    HttpResponse::Ok().json(response)
+
+    let meta = match database.find_video(id).await {
+        Ok(meta) => Some(meta.into()),
+        Err(crate::db::Error::Diesel(diesel::result::Error::NotFound)) => None,
+        Err(err) => {
+            return HttpResponse::InternalServerError()
+                .body(format!("Error querying the video from database: {err}"));
+        }
+    };
+
+    HttpResponse::Ok().json(Response { meta })
 }
 
 #[get("/content/{id}")]
-async fn get_content(content_path: web::Data<PathBuf>, id: web::Path<String>) -> impl Responder {
-    let mut filepath = content_path.join(id.into_inner());
-    filepath.set_extension("mp4");
+async fn get_content(database: web::Data<Database>, id: web::Path<String>) -> impl Responder {
+    let Ok(id) = id.into_inner().try_into() else {
+        return HttpResponse::BadRequest().body("Invalid video ID");
+    };
+
+    let Ok(crate::db::Video {
+        download_status: crate::db::DownloadStatus::Downloaded(filepath),
+        ..
+    }) = database.increment_view_count(id).await
+    else {
+        return HttpResponse::NotFound().body("Requested video ID is not available");
+    };
 
     let mut file = match tokio::fs::File::open(filepath).await {
         Ok(file) => file,
