@@ -11,8 +11,6 @@ use diesel::{connection::SimpleConnection, prelude::*};
 
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
-use crate::db::models::VideoInner;
-
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 #[derive(thiserror::Error, Debug)]
@@ -78,11 +76,11 @@ impl Database {
             .interact(move |conn| {
                 use schema::videos::dsl;
 
-                let video = dsl::videos
+                let video: Video = dsl::videos
                     .filter(dsl::id.eq(&req_id))
-                    .select(models::VideoInner::as_select())
+                    .select(Video::as_select())
                     .get_result(conn)?;
-                video.try_into()
+                Ok(video)
             })
             .await
             .expect("Unexpected panic of a background DB thread")
@@ -128,10 +126,10 @@ impl Database {
         connection
             .interact(move |c| -> Result<Video> {
                 use schema::videos::dsl;
-                let v: VideoInner = diesel::update(dsl::videos.find(req_id.to_string()))
+                Ok(diesel::update(dsl::videos.find(req_id.to_string()))
                     .set((dsl::view_count.eq(dsl::view_count + 1),))
-                    .get_result(c)?;
-                v.try_into()
+                    .returning(Video::as_select())
+                    .get_result(c)?)
             })
             .await
             .expect("Unexpected panic of a background DB thread")
