@@ -9,5 +9,6 @@ diesel::table! {
         download_status -> BigInt,
         view_count -> BigInt,
         message -> Text,
+        file_path -> Binary,
     }
 }

@@ -8,12 +8,14 @@ pub struct Progress(pub f64);
 /// The status of the video download
 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Clone)]
 pub enum VideoStatus {
+    /// The video download has not started
+    Pending,
     /// The video download is in progress
     Downloading(Progress),
     /// The video download is completed
     Downloaded,
     /// The video download failed
-    Failed,
+    Failed(String),
 }
 
 /// Metadata of a single video of the local server.
