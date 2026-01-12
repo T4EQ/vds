@@ -37,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
             .context("While initializing database")?,
     );
 
-    println!("Listening on {}", listener.local_addr()?);
+    println!("Started server at http://{}", listener.local_addr()?);
     vds_server::run_app(listener, database)?.await?;
 
     Ok(())
