@@ -1,6 +1,15 @@
 debug = true
+
+[db_config]
 runtime_path = "/tmp/vds/runtime_path"
-remote_server = "/tmp/vds/remote_server"
+busy_timeout = "10 seconds"
+
+[downloader_config]
+concurrent_downloads = 8
+content_path = "/tmp/vds/content_path"
+remote_server = "/tmp/vds/fake_remote_server"
+initial_backoff = "5 seconds"
+update_interval = "20 seconds"
 
 [http_config]
 listen_address = "127.0.0.1"

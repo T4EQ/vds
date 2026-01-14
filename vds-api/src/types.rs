@@ -29,17 +29,16 @@ pub struct LocalVideoMeta {
     pub size: usize,
     /// Download status
     pub status: VideoStatus,
+    /// Total views of the video
+    pub view_count: u64,
 }
 
-/// Metadata of a single video present in the remote server.
-#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, Clone)]
-pub struct RemoteVideoMeta {
-    /// Unique identifier of the video
-    pub id: String,
-    /// Human-readable name of the video
+/// Grouped section of video content
+#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Clone)]
+pub struct GroupedSection {
+    /// Name of the section
     pub name: String,
-    /// Size of the video in bytes
-    pub size: usize,
-    /// flag indicating whether the video is also locally cached.
-    pub local: bool,
+
+    /// Content within the section. Ordered as displayed
+    pub content: Vec<LocalVideoMeta>,
 }

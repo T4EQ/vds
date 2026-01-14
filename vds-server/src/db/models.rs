@@ -15,6 +15,12 @@ pub enum DownloadStatus {
     Downloaded(PathBuf),
 }
 
+impl DownloadStatus {
+    pub fn is_downloaded(&self) -> bool {
+        matches!(self, DownloadStatus::Downloaded(_))
+    }
+}
+
 impl Selectable<diesel::sqlite::Sqlite> for DownloadStatus {
     type SelectExpression = (
         schema::videos::dsl::file_size,
