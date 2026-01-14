@@ -1,15 +1,33 @@
 use std::ops::Deref;
 
 /// Version data type made of major, minor and revision numbers.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Version {
     pub major: u32,
     pub minor: u32,
     pub revision: u32,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Sha256(String);
+
+impl TryFrom<&str> for Sha256 {
+    type Error = String;
+
+    fn try_from(v: &str) -> Result<Self, String> {
+        use regex::Regex;
+        use std::sync::LazyLock;
+        static SHA_REGEX: LazyLock<Regex> = std::sync::LazyLock::new(|| {
+            regex::Regex::new("^[0-9a-f]{64}$").expect("Invalid sha256 regex")
+        });
+
+        if !SHA_REGEX.is_match(v) {
+            return Err(format!("\"{v}\" is not a valid SHA-256"));
+        };
+
+        Ok(Self(v.to_string()))
+    }
+}
 
 impl Deref for Sha256 {
     type Target = str;
@@ -19,7 +37,7 @@ impl Deref for Sha256 {
 }
 
 /// Metadata for a single video entry
-#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, Clone)]
 pub struct Video {
     /// Human-readable name of the video
     pub name: String,
@@ -34,10 +52,13 @@ pub struct Video {
 
     /// SHA-256 of the video file
     pub sha256: Sha256,
+
+    /// File size in bytes
+    pub file_size: u64,
 }
 
 /// A section of content that groups together a number of videos
-#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, Clone)]
 pub struct Section {
     /// Name of the section
     pub name: String,
@@ -47,7 +68,7 @@ pub struct Section {
 }
 
 /// Describes the set of videos and sections to be shown in the VDS.
-#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, Clone)]
 pub struct ManifestFile {
     /// Name of the distribution list
     pub name: String,
@@ -194,17 +215,7 @@ mod sha256 {
         where
             E: serde::de::Error,
         {
-            use regex::Regex;
-            use std::sync::LazyLock;
-            static SHA_REGEX: LazyLock<Regex> = std::sync::LazyLock::new(|| {
-                regex::Regex::new("^[0-9a-f]{64}$").expect("Invalid sha256 regex")
-            });
-
-            if !SHA_REGEX.is_match(v) {
-                return Err(E::custom("Invalid Sha256."));
-            };
-
-            Ok(super::Sha256(v.to_string()))
+            v.try_into().map_err(|e| E::custom(e))
         }
     }
 }
@@ -317,7 +328,8 @@ pub mod test {
             "name": "Linear equations",
             "id": "bf978778-1c5d-44b3-b2c1-1cc253563799",
             "uri": "s3://bucket/linear-equations.mp4",
-            "sha256": "0b88b2dec2be5e2ef74022ef6a8023232e28374d67e917b76f9bb607e691f327"
+            "sha256": "0b88b2dec2be5e2ef74022ef6a8023232e28374d67e917b76f9bb607e691f327",
+            "file_size": 123456
         }"#;
 
         let video: Video = serde_json::from_str(serialized).unwrap();
@@ -330,6 +342,7 @@ pub mod test {
                 sha256: Sha256(
                     "0b88b2dec2be5e2ef74022ef6a8023232e28374d67e917b76f9bb607e691f327".to_string()
                 ),
+                file_size: 123456,
             })
         );
         Ok(())
@@ -344,19 +357,22 @@ pub mod test {
                     "name": "Linear equations",
                     "id": "bf978778-1c5d-44b3-b2c1-1cc253563799",
                     "uri": "s3://bucket/linear-equations.mp4",
-                    "sha256": "0b88b2dec2be5e2ef74022ef6a8023232e28374d67e917b76f9bb607e691f327"
+                    "sha256": "0b88b2dec2be5e2ef74022ef6a8023232e28374d67e917b76f9bb607e691f327",
+                    "file_size": 123456
                 },
                 {
                     "name": "Quadratic equations",
                     "id": "5eb9e089-79cf-478d-9121-9ca3e7bb1d4a",
                     "uri": "s3://bucket/quadratic-equations.mp4",
-                    "sha256": "8f9e3a4ae7d86c4abdf731a947fc90b607b82a0362da0b312e3b644defedb81f"
+                    "sha256": "8f9e3a4ae7d86c4abdf731a947fc90b607b82a0362da0b312e3b644defedb81f",
+                    "file_size": 123457
                 },
                 {
                     "name": "Cubic equations",
                     "id": "9e0f44b6-3dc6-4f56-8c9f-7e28feac1d03",
                     "uri": "s3://bucket/cubic-equations.mp4",
-                    "sha256": "8b9522ce42fb02dd100b575714d935a4502872afccee80f7a65d466389a5bef8"
+                    "sha256": "8b9522ce42fb02dd100b575714d935a4502872afccee80f7a65d466389a5bef8",
+                    "file_size": 123458
                 }
             ]
         }"#;
@@ -376,6 +392,7 @@ pub mod test {
                             "0b88b2dec2be5e2ef74022ef6a8023232e28374d67e917b76f9bb607e691f327"
                                 .to_string()
                         ),
+                        file_size: 123456,
                     },
                     Video {
                         name: "Quadratic equations".to_string(),
@@ -386,6 +403,7 @@ pub mod test {
                             "8f9e3a4ae7d86c4abdf731a947fc90b607b82a0362da0b312e3b644defedb81f"
                                 .to_string()
                         ),
+                        file_size: 123457,
                     },
                     Video {
                         name: "Cubic equations".to_string(),
@@ -396,6 +414,7 @@ pub mod test {
                             "8b9522ce42fb02dd100b575714d935a4502872afccee80f7a65d466389a5bef8"
                                 .to_string()
                         ),
+                        file_size: 123458,
                     },
                 ]
             })
@@ -417,19 +436,22 @@ pub mod test {
                     "name": "Linear equations",
                     "id": "bf978778-1c5d-44b3-b2c1-1cc253563799",
                     "uri": "s3://bucket/linear-equations.mp4",
-                    "sha256": "0b88b2dec2be5e2ef74022ef6a8023232e28374d67e917b76f9bb607e691f327"
+                    "sha256": "0b88b2dec2be5e2ef74022ef6a8023232e28374d67e917b76f9bb607e691f327",
+                    "file_size": 123456
                 },
                 {
                     "name": "Quadratic equations",
                     "id": "5eb9e089-79cf-478d-9121-9ca3e7bb1d4a",
                     "uri": "s3://bucket/quadratic-equations.mp4",
-                    "sha256": "8f9e3a4ae7d86c4abdf731a947fc90b607b82a0362da0b312e3b644defedb81f"
+                    "sha256": "8f9e3a4ae7d86c4abdf731a947fc90b607b82a0362da0b312e3b644defedb81f",
+                    "file_size": 123457
                 },
                 {
                     "name": "Cubic equations",
                     "id": "9e0f44b6-3dc6-4f56-8c9f-7e28feac1d03",
                     "uri": "s3://bucket/cubic-equations.mp4",
-                    "sha256": "8b9522ce42fb02dd100b575714d935a4502872afccee80f7a65d466389a5bef8"
+                    "sha256": "8b9522ce42fb02dd100b575714d935a4502872afccee80f7a65d466389a5bef8",
+                    "file_size": 123458
                 }
             ]
         },
@@ -440,13 +462,15 @@ pub mod test {
                     "name": "Riemann sum",
                     "id": "eddb4450-a9ff-4a4b-ad81-2a8b78998405",
                     "uri": "s3://bucket/riemann-sum.mp4",
-                    "sha256": "a6d3b80cd14f78b21ffbf5995bbda38ad8834459557782d245ed720134d36fc4"
+                    "sha256": "a6d3b80cd14f78b21ffbf5995bbda38ad8834459557782d245ed720134d36fc4",
+                    "file_size": 123459
                 },
                 {
                     "name": "List of integrals",
                     "id": "f47e6cdc-1bcf-439a-9ea4-038dc7153648",
                     "uri": "s3://bucket/list-of-integrals.mp4",
-                    "sha256": "98780990e94fb55d0b88ebcd78fe82f069eac547731a4b0822332d826c970aec"
+                    "sha256": "98780990e94fb55d0b88ebcd78fe82f069eac547731a4b0822332d826c970aec",
+                    "file_size": 123460
                 }
             ]
         }
@@ -472,6 +496,7 @@ pub mod test {
                             sha256:
                                 Sha256("0b88b2dec2be5e2ef74022ef6a8023232e28374d67e917b76f9bb607e691f327"
                                     .to_string()),
+                            file_size: 123456,
                         },
                         Video {
                             name: "Quadratic equations".to_string(),
@@ -481,6 +506,7 @@ pub mod test {
                             sha256:
                                 Sha256("8f9e3a4ae7d86c4abdf731a947fc90b607b82a0362da0b312e3b644defedb81f"
                                     .to_string()),
+                            file_size: 123457,
                         },
                         Video {
                             name: "Cubic equations".to_string(),
@@ -490,6 +516,7 @@ pub mod test {
                             sha256:
                                 Sha256("8b9522ce42fb02dd100b575714d935a4502872afccee80f7a65d466389a5bef8"
                                     .to_string()),
+                            file_size: 123458,
                         },
                     ]
                     },
@@ -504,6 +531,7 @@ pub mod test {
                             sha256:
                                 Sha256("a6d3b80cd14f78b21ffbf5995bbda38ad8834459557782d245ed720134d36fc4"
                                     .to_string()),
+                            file_size: 123459,
                         },
                         Video {
                             name: "List of integrals".to_string(),
@@ -513,6 +541,7 @@ pub mod test {
                             sha256:
                                 Sha256("98780990e94fb55d0b88ebcd78fe82f069eac547731a4b0822332d826c970aec"
                                     .to_string()),
+                            file_size: 123460,
                         },
                     ]
                     }

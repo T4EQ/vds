@@ -25,20 +25,12 @@ pub mod api {
     pub mod content {
         pub mod meta {
             pub mod get {
-                pub use crate::types::{LocalVideoMeta, Progress, VideoStatus};
-
-                /// The query that can be used in a `GET` `api/content/meta` request
-                #[derive(Default, Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
-                pub struct Query {
-                    /// Maximum number of videos to list
-                    pub limit: Option<usize>,
-                    // TODO: add pagination (offset).
-                }
+                pub use crate::types::{GroupedSection, LocalVideoMeta, Progress, VideoStatus};
 
                 /// The response to the `GET` `api/content/meta` request
                 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq)]
                 pub struct Response {
-                    pub videos: Vec<LocalVideoMeta>,
+                    pub videos: Vec<GroupedSection>,
                 }
             }
 

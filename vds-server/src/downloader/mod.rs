@@ -1,0 +1,134 @@
+mod backend;
+mod tasks;
+
+use std::{path::PathBuf, sync::Arc};
+
+use crate::{cfg::DownloaderConfig, db::Database};
+use backend::FileBackend;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("I/O error reading from backend: {0}")]
+    IoError(#[from] std::io::Error),
+}
+
+type DownloadJoinHandle = tokio::task::JoinHandle<anyhow::Result<()>>;
+
+#[derive(Clone)]
+struct DownloadContext {
+    config: Arc<DownloaderConfig>,
+    backend: Arc<dyn backend::Backend>,
+    db: Arc<Database>,
+}
+
+async fn check_updates(
+    ctx: DownloadContext,
+    pending_task: &mut Option<DownloadJoinHandle>,
+) -> anyhow::Result<()> {
+    println!("Checking manifest updates");
+
+    // Inspect new manifest file
+    let Ok(manifest_data) = ctx.backend.fetch_manifest().await.inspect_err(|err| {
+        println!("Error fetching manifest: {err}");
+    }) else {
+        return Ok(());
+    };
+
+    let Ok(new_manifest) = serde_json::from_slice(&manifest_data).inspect_err(|err| {
+        println!("Received manifest with invalid format from the server: {err}");
+    }) else {
+        return Ok(());
+    };
+
+    let cur_manifest = ctx.db.current_manifest().await;
+    let is_more_recent_manifest = cur_manifest
+        .as_ref()
+        .is_none_or(|v| *v != new_manifest && v.date.cmp(&new_manifest.date).is_lt());
+
+    if !is_more_recent_manifest {
+        // Nothing to do, the manifest has not changed
+        println!(
+            "Current Manifest dated on {} is up to date",
+            cur_manifest.as_ref().unwrap().date
+        );
+        return Ok(());
+    }
+    drop(cur_manifest);
+
+    println!("Found updated manifest");
+
+    // Note that we do not yet update the actual in-memory manifest, because we need to first make
+    // sure that the db contains the corresponding entries
+    ctx.db.save_manifest_to_disk(&manifest_data).await?;
+
+    // Stop existing tasks, given we found an even more recent task
+    if let Some(old_task) = pending_task.take() {
+        if old_task.is_finished() {
+            old_task.await??;
+        } else {
+            old_task.abort();
+            match old_task.await {
+                // This is a degenerate case in which the task is still able to finish even though
+                // we cancelled it. It can happen due to race conditions.
+                Ok(task_retval) => task_retval?,
+                Err(e) if e.is_cancelled() => {
+                    println!("Canceled previous download task in favor of a new task");
+                }
+                Err(e) => {
+                    return Err(e.into());
+                }
+            }
+        }
+    }
+
+    let download_manifest_task = tasks::download_manifest_task(ctx, new_manifest);
+    pending_task.replace(tokio::task::spawn(download_manifest_task));
+
+    Ok(())
+}
+
+pub async fn run_downloader(config: DownloaderConfig, db: Arc<Database>) -> anyhow::Result<()> {
+    let config = Arc::new(config);
+
+    // The backend can be either a local file path or an S3 bucket. We allow local filepaths
+    // for simple testing of the server.
+    let backend: Arc<dyn backend::Backend> = match config.remote_server.scheme_str() {
+        // If we don't have a scheme, we assume it is a file path
+        None | Some("file://") => {
+            let path: PathBuf = config.remote_server.path().into();
+            Arc::new(FileBackend::new(&path))
+        }
+        Some("s3://") => {
+            // We will hook up the S3Backend here, once available.
+            unimplemented!()
+        }
+        Some(scheme) => {
+            anyhow::bail!("Unknown remote server URI scheme: {scheme}");
+        }
+    };
+
+    let download_context = DownloadContext {
+        config,
+        backend,
+        db,
+    };
+
+    // We keep track of the last pending task so that we can cancel it if we discovered an
+    // even-newer manifest
+    let mut pending_task: Option<DownloadJoinHandle> = None;
+
+    // Because the system might have restarted while downloading the current manifest, we
+    // have to spawn a download task to verify that it is actually downloaded, or fetch whatever
+    // is remaining.
+    if let Some(cur_manifest) = download_context.db.current_manifest().await.clone() {
+        let download_manifest_task =
+            tasks::download_manifest_task(download_context.clone(), cur_manifest);
+        pending_task.replace(tokio::task::spawn(download_manifest_task));
+    }
+
+    loop {
+        tokio::time::sleep(download_context.config.update_interval).await;
+
+        check_updates(download_context.clone(), &mut pending_task).await?;
+    }
+}

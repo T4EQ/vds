@@ -24,19 +24,65 @@ pub struct HttpServerConfig {
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
-pub struct VdsConfig {
-    /// Enables debug logging/tracing.
-    pub debug: bool,
+pub struct DownloaderConfig {
+    /// Number of maximum concurrent downloads.
+    pub concurrent_downloads: usize,
 
-    /// The read/writeable path where the database, video files and manifest files will be stored.
-    pub runtime_path: PathBuf,
+    /// The read/writeable path where the video files will be stored.
+    pub content_path: PathBuf,
 
     /// URI of the remote server providing the manifest and content cached by the VDS.
     #[serde(with = "parse_uri")]
     pub remote_server: Uri,
 
+    /// The initial backoff time after a download failure.
+    #[serde(with = "humantime_serde")]
+    pub initial_backoff: std::time::Duration,
+
+    /// The interval at which the remote is queried for new content.
+    #[serde(with = "humantime_serde")]
+    pub update_interval: std::time::Duration,
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+pub struct DbConfig {
+    /// The maximum amount of time that the DB thread will wait until the DB is available for its
+    /// operation. Sqlite does not allow concurrent reads and writes, and therefore, it might block
+    /// until one completes
+    #[serde(with = "humantime_serde")]
+    pub busy_timeout: std::time::Duration,
+
+    /// The path where the database contents are stored
+    pub runtime_path: PathBuf,
+}
+
+impl DbConfig {
+    pub fn db_path(&self) -> PathBuf {
+        self.runtime_path.join("vds.db")
+    }
+
+    pub fn manifest_path(&self) -> PathBuf {
+        self.runtime_path.join("current_manifest.json")
+    }
+
+    pub fn temp_manifest_path(&self) -> PathBuf {
+        self.runtime_path.join("_temp_manifest.json")
+    }
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
+pub struct VdsConfig {
+    /// Enables debug logging/tracing.
+    pub debug: bool,
+
     /// HTTP Server configuration
     pub http_config: HttpServerConfig,
+
+    /// Downloader service configuration
+    pub downloader_config: DownloaderConfig,
+
+    /// Database configuration
+    pub db_config: DbConfig,
 }
 
 /// Parses the configuration of the VDS, returning a VdsConfig struct.

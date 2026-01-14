@@ -3,18 +3,18 @@ use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use vds_api::api::content::meta::get::{LocalVideoMeta, Response, VideoStatus};
+use vds_api::api::content::meta::get::{GroupedSection, LocalVideoMeta, Response, VideoStatus};
 
 use crate::app::Route;
 
 #[derive(yew::Properties, PartialEq)]
 pub struct VideoCardProps {
-    index: usize,
+    section_name: String,
     video: LocalVideoMeta,
 }
 
 #[function_component(VideoCard)]
-pub fn video_card(VideoCardProps { index, video }: &VideoCardProps) -> Html {
+pub fn video_card(VideoCardProps { video, .. }: &VideoCardProps) -> Html {
     let byte_to_megabytes = |bytes: usize| bytes as f64 / 1024.0 / 1024.0;
 
     let downloaded = video.status == VideoStatus::Downloaded;
@@ -36,7 +36,7 @@ pub fn video_card(VideoCardProps { index, video }: &VideoCardProps) -> Html {
     };
 
     html! {
-        <div class="video-card" key={*index}>
+        <div class="video-card">
             <div class={classes!{"video-icon", (!downloaded).then_some("disabled")}}>
                 <span class="play-icon">{ "▶" }</span>
             </div>
@@ -52,7 +52,7 @@ pub fn video_card(VideoCardProps { index, video }: &VideoCardProps) -> Html {
     }
 }
 
-async fn fetch_video_content() -> Option<Vec<LocalVideoMeta>> {
+async fn fetch_video_content() -> Option<Vec<GroupedSection>> {
     let response = match Request::get("/api/content/meta").send().await {
         Ok(v) => v,
         Err(e) => {
@@ -74,19 +74,19 @@ async fn fetch_video_content() -> Option<Vec<LocalVideoMeta>> {
 
 #[function_component(VideoList)]
 pub fn video_list() -> Html {
-    let videos: UseStateHandle<Option<Vec<LocalVideoMeta>>> = use_state(|| None);
+    let sections: UseStateHandle<Option<Vec<GroupedSection>>> = use_state(|| None);
 
-    use_effect_with(videos.clone(), move |vids| {
-        if vids.is_none() {
-            let vids = vids.clone();
+    use_effect_with(sections.clone(), move |sections| {
+        if sections.is_none() {
+            let sections = sections.clone();
             spawn_local(async move {
-                vids.set(fetch_video_content().await);
+                sections.set(fetch_video_content().await);
             });
         }
         || ()
     });
 
-    if let Some(videos) = &*videos {
+    if let Some(sections) = &*sections {
         html! {
             <div class="dashboard">
                 <header class="dashboard-header">
@@ -96,8 +96,11 @@ pub fn video_list() -> Html {
 
                 <div class="video-grid">
                     {
-                        videos.iter().enumerate().map(|(index, video)|
-                            html! { <VideoCard video={video.clone()} index={index} /> }
+                        sections.iter().flat_map(|section|
+                            // TODO: Split videos by section. At this time I do not want to change
+                            // the UI, but it needs to be done.
+                            section.content.iter().map(|video|
+                                html! { <VideoCard section_name={section.name.clone()} video={video.clone()} /> })
                         ).collect::<Html>()
                     }
                 </div>

@@ -1,9 +1,7 @@
-use std::sync::LazyLock;
-
 use actix_web::{HttpResponse, Responder, get, post, web};
 use tokio::io::AsyncReadExt;
 
-use vds_api::api::content::meta::get::{LocalVideoMeta, Progress, VideoStatus};
+use vds_api::api::content::meta::get::{GroupedSection, LocalVideoMeta, Progress, VideoStatus};
 
 use crate::db::Database;
 
@@ -27,59 +25,32 @@ impl From<crate::db::Video> for LocalVideoMeta {
             name: value.name,
             size: value.file_size as usize,
             status: value.download_status.into(),
+            view_count: value.view_count,
         }
     }
 }
 
-static MOCK_VIDEOS: LazyLock<Vec<LocalVideoMeta>> = LazyLock::new(|| {
-    vec![
-        LocalVideoMeta {
-            id: "1".to_string(),
-            name: "Introduction to Mathematics".to_string(),
-            size: 245 * 1024 * 1024,
-            status: VideoStatus::Downloaded,
-        },
-        LocalVideoMeta {
-            id: "2".to_string(),
-            name: "Basic Science Concepts".to_string(),
-            size: 312 * 1024 * 1024,
-            status: VideoStatus::Downloading(Progress(0.5)),
-        },
-        LocalVideoMeta {
-            id: "3".to_string(),
-            name: "English Grammar Fundamentals".to_string(),
-            size: 189 * 1024 * 1024,
-            status: VideoStatus::Downloaded,
-        },
-        LocalVideoMeta {
-            id: "4".to_string(),
-            name: "History of Ancient Civilizations".to_string(),
-            size: 456 * 1024 * 1024,
-            status: VideoStatus::Failed("Because of reasons".to_string()),
-        },
-        LocalVideoMeta {
-            id: "5".to_string(),
-            name: "Environmental Science Basics".to_string(),
-            size: 378 * 1024 * 1024,
-            status: VideoStatus::Downloaded,
-        },
-    ]
-});
-
 #[get("/content/meta")]
-async fn list_content_metadata(
-    web::Query(query): web::Query<vds_api::api::content::meta::get::Query>,
-) -> impl Responder {
+async fn list_content_metadata(database: web::Data<Database>) -> impl Responder {
     use vds_api::api::content::meta::get::Response;
 
-    let response = {
-        let mut videos = MOCK_VIDEOS.clone();
-        if let Some(limit) = query.limit {
-            videos.resize_with(limit.min(videos.len()), || unreachable!());
+    let sections = match database.current_manifest_sections().await {
+        Ok(sections) => sections,
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+                .body(format!("Unexpected error querying content list: {e:?}"));
         }
-        Response { videos }
     };
-    HttpResponse::Ok().json(response)
+
+    let videos = sections
+        .into_iter()
+        .map(|(name, content)| {
+            let content = content.into_iter().map(|v| v.into()).collect();
+            GroupedSection { name, content }
+        })
+        .collect();
+
+    HttpResponse::Ok().json(Response { videos })
 }
 
 #[get("/content/meta/{id}")]
@@ -138,9 +109,14 @@ async fn get_content(database: web::Data<Database>, id: web::Path<String>) -> im
 }
 
 #[get("/manifest/latest")]
-async fn get_manifest() -> impl Responder {
-    // FIXME: Do not use a hardcoded manifest
-    let manifest_file = include_str!("../../../docs/manifest-example.json");
+async fn get_manifest(database: web::Data<Database>) -> impl Responder {
+    let manifest = database.current_manifest().await;
+
+    let manifest_file = manifest
+        .as_ref()
+        .and_then(|m| serde_json::to_string(m).ok())
+        .unwrap_or_else(|| "".to_string());
+
     HttpResponse::Ok()
         .content_type("application/json")
         .body(manifest_file)
