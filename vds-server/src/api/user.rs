@@ -3,7 +3,7 @@ use tokio::io::AsyncReadExt;
 
 use vds_api::api::content::meta::get::{GroupedSection, LocalVideoMeta, Progress, VideoStatus};
 
-use crate::db::Database;
+use crate::{api::ApiData, downloader::UserCommand};
 
 impl From<crate::db::DownloadStatus> for VideoStatus {
     fn from(value: crate::db::DownloadStatus) -> Self {
@@ -31,10 +31,10 @@ impl From<crate::db::Video> for LocalVideoMeta {
 }
 
 #[get("/content/meta")]
-async fn list_content_metadata(database: web::Data<Database>) -> impl Responder {
+async fn list_content_metadata(api_data: web::Data<ApiData>) -> impl Responder {
     use vds_api::api::content::meta::get::Response;
 
-    let sections = match database.current_manifest_sections().await {
+    let sections = match api_data.db.current_manifest_sections().await {
         Ok(sections) => sections,
         Err(e) => {
             return HttpResponse::InternalServerError()
@@ -55,7 +55,7 @@ async fn list_content_metadata(database: web::Data<Database>) -> impl Responder 
 
 #[get("/content/meta/{id}")]
 async fn content_metadata_for_id(
-    database: web::Data<Database>,
+    api_data: web::Data<ApiData>,
     id: web::Path<String>,
 ) -> impl Responder {
     use vds_api::api::content::meta::id::get::Response;
@@ -63,7 +63,7 @@ async fn content_metadata_for_id(
         return HttpResponse::BadRequest().body("Invalid video ID");
     };
 
-    let meta = match database.find_video(id).await {
+    let meta = match api_data.db.find_video(id).await {
         Ok(meta) => Some(meta.into()),
         Err(crate::db::Error::Diesel(diesel::result::Error::NotFound)) => None,
         Err(err) => {
@@ -76,7 +76,7 @@ async fn content_metadata_for_id(
 }
 
 #[get("/content/{id}")]
-async fn get_content(database: web::Data<Database>, id: web::Path<String>) -> impl Responder {
+async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> impl Responder {
     let Ok(id) = id.into_inner().try_into() else {
         return HttpResponse::BadRequest().body("Invalid video ID");
     };
@@ -84,7 +84,7 @@ async fn get_content(database: web::Data<Database>, id: web::Path<String>) -> im
     let Ok(crate::db::Video {
         download_status: crate::db::DownloadStatus::Downloaded(filepath),
         ..
-    }) = database.increment_view_count(id).await
+    }) = api_data.db.increment_view_count(id).await
     else {
         return HttpResponse::NotFound().body("Requested video ID is not available");
     };
@@ -109,8 +109,8 @@ async fn get_content(database: web::Data<Database>, id: web::Path<String>) -> im
 }
 
 #[get("/manifest/latest")]
-async fn get_manifest(database: web::Data<Database>) -> impl Responder {
-    let manifest = database.current_manifest().await;
+async fn get_manifest(api_data: web::Data<ApiData>) -> impl Responder {
+    let manifest = api_data.db.current_manifest().await;
 
     let manifest_file = manifest
         .as_ref()
@@ -123,7 +123,11 @@ async fn get_manifest(database: web::Data<Database>) -> impl Responder {
 }
 
 #[post("/manifest/fetch")]
-async fn fetch_manifest() -> impl Responder {
-    // TODO: Implement
-    HttpResponse::Ok()
+async fn fetch_manifest(api_data: web::Data<ApiData>) -> impl Responder {
+    match api_data.cmd_sender.send(UserCommand::FetchManifest) {
+        Ok(()) => HttpResponse::Ok().finish(),
+        Err(e) => {
+            HttpResponse::InternalServerError().body(format!("Unable to handle request: {e}"))
+        }
+    }
 }
