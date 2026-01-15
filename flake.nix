@@ -32,9 +32,8 @@
           in
           fn pkgs
         );
-    in
-    rec {
-      packages = forEachSystem (
+
+      vdsPackageWithPkgs =
         pkgs:
         let
           rustPlatform = pkgs.makeRustPlatform (
@@ -47,24 +46,23 @@
             }
           );
         in
-        rec {
-          vds = rustPlatform.buildRustPackage {
-            pname = "vds";
-            version = "0.1.0";
-            src = ./.;
+        rustPlatform.buildRustPackage {
+          pname = "vds";
+          version = "0.1.0";
+          src = ./.;
 
-            cargoLock = {
-              lockFile = ./Cargo.lock;
-            };
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
 
-            nativeBuildInputs = [
-              pkgs.trunk
-              pkgs.wasm-bindgen-cli_0_2_106
-              pkgs.dart-sass
-              pkgs.lld
-            ];
+          nativeBuildInputs = [
+            pkgs.trunk
+            pkgs.wasm-bindgen-cli_0_2_106
+            pkgs.dart-sass
+            pkgs.lld
+          ];
 
-            buildPhase = "
+          buildPhase = "
             runHook preBuild
 
             # Let stdenv handle stripping, for consistency and to not break
@@ -77,11 +75,14 @@
 
             echo Finished cargo build
           ";
-          };
-
-          default = vds;
-        }
-      );
+        };
+    in
+    rec {
+      packages = forEachSystem (pkgs: rec {
+        vds = vdsPackageWithPkgs pkgs;
+        vds-target = vdsPackageWithPkgs pkgs.pkgsCross.aarch64-multiplatform-musl;
+        default = vds;
+      });
 
       # Much older versions of nix (from around 2022) used a different attribute to mark the default package.
       # This is included for compatibility with those versions.
