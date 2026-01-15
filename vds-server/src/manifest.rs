@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{fmt::Display, ops::Deref};
 
 /// Version data type made of major, minor and revision numbers.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -10,6 +10,48 @@ pub struct Version {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Sha256(String);
+
+impl Display for Sha256 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Sha256 {
+    pub fn as_bytes(&self) -> [u8; 32] {
+        (0..32)
+            .map(|byte_idx| {
+                u8::from_str_radix(&self.0[2 * byte_idx..2 * byte_idx + 2], 16)
+                    .expect("Sha256 should be a valid hex string of 64 chars")
+            })
+            .collect::<Vec<u8>>()
+            .try_into()
+            .expect("Sha256 can only be constructed with 64 characters")
+    }
+}
+
+impl TryFrom<&[u8]> for Sha256 {
+    type Error = String;
+
+    fn try_from(v: &[u8]) -> Result<Self, String> {
+        if v.len() != 32 {
+            return Err(format!(
+                "Sha256 can only be constructed from a 32-byte slice. Got {} bytes",
+                v.len()
+            ));
+        }
+
+        Ok(Sha256(
+            v.iter()
+                .flat_map(|byte| {
+                    let msb = char::from_digit((byte >> 4) as u32, 16).unwrap();
+                    let lsb = char::from_digit((byte & 0x0f) as u32, 16).unwrap();
+                    std::iter::once(msb).chain(std::iter::once(lsb))
+                })
+                .collect(),
+        ))
+    }
+}
 
 impl TryFrom<&str> for Sha256 {
     type Error = String;
