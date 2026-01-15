@@ -24,6 +24,21 @@ pub struct HttpServerConfig {
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
+pub struct RetryParams {
+    /// The initial backoff time after a download failure.
+    #[serde(with = "humantime_serde")]
+    pub initial_backoff: std::time::Duration,
+
+    /// The adjustement factor for the backoff after a failure. Must be larger than 1 so that
+    /// the backoff actually increments exponentially
+    pub backoff_factor: f64,
+
+    /// The maximum backoff time after a download failure.
+    #[serde(with = "humantime_serde")]
+    pub max_backoff: std::time::Duration,
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
 pub struct DownloaderConfig {
     /// Number of maximum concurrent downloads.
     pub concurrent_downloads: usize,
@@ -35,13 +50,12 @@ pub struct DownloaderConfig {
     #[serde(with = "parse_uri")]
     pub remote_server: Uri,
 
-    /// The initial backoff time after a download failure.
-    #[serde(with = "humantime_serde")]
-    pub initial_backoff: std::time::Duration,
-
     /// The interval at which the remote is queried for new content.
     #[serde(with = "humantime_serde")]
     pub update_interval: std::time::Duration,
+
+    /// Retry parameters when a download fails.
+    pub retry_params: RetryParams,
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]

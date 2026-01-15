@@ -25,31 +25,28 @@ pub async fn run_app(listener: TcpListener, config: VdsConfig) -> anyhow::Result
 
     let (user_command_sender, user_command_receiver) = mpsc::unbounded_channel();
 
-    let downloader_fut = downloader::run_downloader(
+    let downloader = downloader::run_downloader(
         config.downloader_config,
         Arc::clone(&database),
         user_command_receiver,
     );
 
-    let database = web::Data::new(api::ApiData::new(
+    let api_data = web::Data::new(api::ApiData::new(
         Arc::clone(&database),
         user_command_sender,
     ));
 
-    let server = HttpServer::new({
-        let database = database.clone();
-        move || {
-            App::new()
-                .app_data(database.clone())
-                .configure(api::register_handlers)
-                .configure(static_files::register_static_files)
-        }
+    let server = HttpServer::new(move || {
+        App::new()
+            .app_data(api_data.clone())
+            .configure(api::register_handlers)
+            .configure(static_files::register_static_files)
     })
     .listen(listener)?
     .run();
 
     tokio::select! {
-        downloader = downloader_fut => {
+        downloader = downloader => {
             downloader?;
             panic!("Unexpected downloader task exit.");
         }
