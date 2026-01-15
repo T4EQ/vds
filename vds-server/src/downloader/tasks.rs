@@ -7,6 +7,7 @@ use super::DownloadContext;
 
 use std::collections::VecDeque;
 
+use sha2::Digest;
 use tokio::{io::AsyncWriteExt, task::JoinSet};
 use tokio_stream::StreamExt;
 
@@ -191,6 +192,8 @@ async fn download_job_task(
         })
     };
 
+    let mut hasher = sha2::Sha256::new();
+
     let mut total_size = 0;
     while let Some(chunk) = stream.next().await {
         let chunk = match chunk {
@@ -208,6 +211,7 @@ async fn download_job_task(
             }
         };
 
+        hasher.update(&chunk[..]);
         target_file.write_all(&chunk[..]).await.map_err(|e| {
             println!("Error writing file: {:?}. Error: {}", target_filepath, e);
             DownloadJobError::ShouldRetry(video.clone())
@@ -221,7 +225,16 @@ async fn download_job_task(
         )?;
     }
 
-    // TODO: Validate SHA256
+    let hash = hasher.finalize();
+    let hash = hash.as_slice();
+    let expected_hash = video.sha256.as_bytes();
+    if hash != &expected_hash[..] {
+        let hash: crate::manifest::Sha256 = hash.try_into().expect("Should have 32 bytes");
+        let err_msg = &format!("Got hash: {hash}. Expected: {}", video.sha256);
+        translate_error(ctx.db.set_download_failed(video.id, err_msg).await)?;
+        println!("{}", err_msg);
+        return Err(DownloadJobError::ShouldRetry(video.clone()));
+    }
 
     translate_error(ctx.db.set_downloaded(video.id, &target_filepath).await)?;
 
@@ -350,9 +363,11 @@ pub mod test {
 
     struct TestContext {
         dummy_backend: Arc<DummyBackend>,
-        content_path: tempfile::TempDir,
-        runtime_path: tempfile::TempDir,
         download_ctx: DownloadContext,
+
+        // We need to keep these to make sure the dirs are not removed from the fs
+        _content_path: tempfile::TempDir,
+        _runtime_path: tempfile::TempDir,
     }
 
     async fn create_context() -> TestContext {
@@ -384,9 +399,9 @@ pub mod test {
 
         TestContext {
             dummy_backend,
-            content_path,
-            runtime_path,
             download_ctx,
+            _content_path: content_path,
+            _runtime_path: runtime_path,
         }
     }
 
@@ -520,8 +535,12 @@ pub mod test {
         let ctx = create_context().await;
         let id = uuid::Uuid::from_str("5eb9e089-79cf-478d-9121-9ca3e7bb1d4a").or_fail()?;
 
+        initialize_video_entries(&ctx.download_ctx.db, &manifest_for_test().or_fail()?)
+            .await
+            .or_fail()?;
+
         let result = download_job_task(
-            ctx.download_ctx,
+            ctx.download_ctx.clone(),
             Video {
                 name: "Quadratic equations".to_string(),
                 id,
@@ -539,6 +558,19 @@ pub mod test {
             err(matches_pattern!(DownloadJobError::ShouldRetry(
                 matches_pattern!(Video { id: &id, .. })
             )))
+        );
+
+        // Check that file is available in the database
+        let db_video = ctx.download_ctx.db.find_video(id).await.or_fail()?;
+        expect_that!(
+            db_video,
+            matches_pattern!(crate::db::Video {
+                id: &id,
+                download_status: matches_pattern!(crate::db::DownloadStatus::Failed(eq(
+                    "Error fetching file with id: 5eb9e089-79cf-478d-9121-9ca3e7bb1d4a, name: Quadratic equations. Error: I/O error reading from backend: "
+                ))),
+                ..
+            })
         );
 
         Ok(())
@@ -569,8 +601,7 @@ pub mod test {
                 name: name.clone(),
                 id,
                 uri,
-                // FIXME: This checksum is incorrect, yet this test passes
-                sha256: "8f9e3a4ae7d86c4abdf731a947fc90b607b82a0362da0b312e3b644defedb81f"
+                sha256: "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a"
                     .try_into()
                     .or_fail()?,
                 file_size: 4,
@@ -600,7 +631,61 @@ pub mod test {
         let data = tokio::fs::read(video_fs_path).await.or_fail()?;
         assert_that!(data, eq(&vec![1, 2, 3, 4]));
 
-        // FIXME: Check with invalid checksum
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[googletest::test]
+    async fn test_download_job_task_invalid_checksum() -> googletest::Result<()> {
+        let ctx = create_context().await;
+        let name = "Quadratic equations".to_string();
+        let id = uuid::Uuid::from_str("5eb9e089-79cf-478d-9121-9ca3e7bb1d4a").or_fail()?;
+        let uri: Uri = "s3://bucket/quadratic-equations.mp4".parse().or_fail()?;
+
+        ctx.dummy_backend
+            .add_file(BackendFile {
+                uri: uri.clone(),
+                content: vec![1, 2, 3, 5],
+            })
+            .await;
+
+        initialize_video_entries(&ctx.download_ctx.db, &manifest_for_test().or_fail()?)
+            .await
+            .or_fail()?;
+
+        let result = download_job_task(
+            ctx.download_ctx.clone(),
+            Video {
+                name: name.clone(),
+                id,
+                uri,
+                sha256: "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a"
+                    .try_into()
+                    .or_fail()?,
+                file_size: 4,
+            },
+        )
+        .await;
+
+        assert_that!(
+            result,
+            err(matches_pattern!(DownloadJobError::ShouldRetry(
+                matches_pattern!(Video { id: &id, .. })
+            )))
+        );
+
+        // Check that file is available in the database
+        let db_video = ctx.download_ctx.db.find_video(id).await.or_fail()?;
+        expect_that!(
+            db_video,
+            matches_pattern!(crate::db::Video {
+                id: &id,
+                download_status: matches_pattern!(crate::db::DownloadStatus::Failed(eq(
+                    "Got hash: 1571902abec0a45661de965dbe90cb0177b98c49fc58a5aabfa1edb6c678d972. Expected: 9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a"
+                ))),
+                ..
+            })
+        );
 
         Ok(())
     }
