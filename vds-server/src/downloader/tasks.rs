@@ -55,6 +55,12 @@ pub async fn remove_old_video_content(
     Ok(())
 }
 
+#[derive(Clone, Debug)]
+struct Job {
+    backoff_time: std::time::Duration,
+    video: Video,
+}
+
 /// An async task in charge of downloading the content listed in a manifest.
 ///
 /// This task needs to be cancel-safe, because it might get cancelled by calling code if a newer
@@ -77,7 +83,7 @@ pub async fn download_manifest_task(
     remove_old_video_content(&ctx.db, &new_manifest).await?;
 
     // Collect the content that we need to download
-    let mut pending_downloads: VecDeque<Video> = VecDeque::new();
+    let mut pending_downloads: VecDeque<Job> = VecDeque::new();
     for video in new_manifest.sections.iter().flat_map(|s| s.content.iter()) {
         let already_downloaded = ctx
             .db
@@ -86,8 +92,11 @@ pub async fn download_manifest_task(
             .unwrap()
             .download_status
             .is_downloaded();
-        if pending_downloads.iter().all(|v| video.id != v.id) && !already_downloaded {
-            pending_downloads.push_back(video.clone());
+        if pending_downloads.iter().all(|j| video.id != j.video.id) && !already_downloaded {
+            pending_downloads.push_back(Job {
+                video: video.clone(),
+                backoff_time: ctx.config.retry_params.initial_backoff,
+            });
         }
     }
 
@@ -103,12 +112,12 @@ pub async fn download_manifest_task(
 
         // Try to start more downloads while we have some
         while inprogress_videos.len() < ctx.config.concurrent_downloads {
-            let Some(current_video) = pending_downloads.pop_front() else {
+            let Some(current_job) = pending_downloads.pop_front() else {
                 break;
             };
 
-            println!("Starting download for {:?}", current_video.id);
-            let job = download_job_task(ctx.clone(), current_video.clone());
+            println!("Starting job for {:?}", current_job.video.id);
+            let job = download_job_task(ctx.clone(), current_job.clone());
             inprogress_videos.spawn(job);
         }
 
@@ -129,29 +138,28 @@ pub async fn download_manifest_task(
             tokio::time::sleep_until(wakeup_time).await;
 
             // Actually finished waiting, so let's pop it off now (to be cancel-safe).
-            let (_, video): (tokio::time::Instant, Video) = backoff_list.pop_front().expect("");
-            video
+            let (_, job): (tokio::time::Instant, Job) = backoff_list.pop_front().expect("");
+            job
         };
 
         tokio::select! {
-            video = first_backoff_video => {
-                println!("Video {} will reattempt download", video.id);
-                pending_downloads.push_back(video);
+            job = first_backoff_video => {
+                println!("Video {} will reattempt download", job.video.id);
+                pending_downloads.push_back(job);
             }
 
             Some(finished_video) = inprogress_videos.join_next() => {
                 match finished_video? {
                     Ok(()) => { }
-                    Err(DownloadJobError::ShouldRetry(video)) => {
-                        println!("Video {} failed. Backing off for {:?}", video.id, ctx.config.initial_backoff);
-
-                        // TODO: Adjust backoff exponentially
-                        let wakeup_time = tokio::time::Instant::now() + ctx.config.initial_backoff;
-                        backoff_list.push_back((wakeup_time, video));
+                    Err(DownloadJobError::ShouldRetry(mut job)) => {
+                        println!("Video {} failed. Backing off for {:?}", job.video.id, job.backoff_time);
+                        let wakeup_time = tokio::time::Instant::now() + job.backoff_time;
+                        job.backoff_time = job.backoff_time .mul_f64( ctx.config.retry_params.backoff_factor);
+                        backoff_list.push_back((wakeup_time, job));
                     }
-                    Err(DownloadJobError::Unrecoverable(video)) => {
-                        println!("Unrecoverable download error for video: {}", video.id);
-                        anyhow::bail!("Unrecoverable error for video: {}", video.id);
+                    Err(DownloadJobError::Unrecoverable(job)) => {
+                        println!("Unrecoverable download error for video: {}", job.video.id);
+                        anyhow::bail!("Unrecoverable error for video: {}", job.video.id);
                     }
                 }
             }
@@ -163,15 +171,13 @@ pub async fn download_manifest_task(
 
 #[derive(Debug)]
 enum DownloadJobError {
-    ShouldRetry(crate::manifest::Video),
-    Unrecoverable(crate::manifest::Video),
+    ShouldRetry(Job),
+    Unrecoverable(Job),
 }
 
 /// download job task
-async fn download_job_task(
-    ctx: DownloadContext,
-    video: crate::manifest::Video,
-) -> Result<(), DownloadJobError> {
+async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), DownloadJobError> {
+    let video = &job.video;
     let mut stream = ctx.backend.fetch_resource(&video.uri);
 
     let target_filepath = ctx.config.content_path.join(format!("{}.mp4", video.id));
@@ -179,7 +185,7 @@ async fn download_job_task(
         .await
         .map_err(|e| {
             println!("Error creating file: {:?}. Error: {}", target_filepath, e);
-            DownloadJobError::ShouldRetry(video.clone())
+            DownloadJobError::ShouldRetry(job.clone())
         })?;
 
     let translate_error = |e: crate::db::Result<()>| {
@@ -188,7 +194,7 @@ async fn download_job_task(
                 "Error setting download status for file: {:?}. Error: {}",
                 target_filepath, e
             );
-            DownloadJobError::Unrecoverable(video.clone())
+            DownloadJobError::Unrecoverable(job.clone())
         })
     };
 
@@ -207,14 +213,14 @@ async fn download_job_task(
 
                 translate_error(ctx.db.set_download_failed(video.id, &error_msg).await)?;
 
-                return Err(DownloadJobError::ShouldRetry(video.clone()));
+                return Err(DownloadJobError::ShouldRetry(job.clone()));
             }
         };
 
         hasher.update(&chunk[..]);
         target_file.write_all(&chunk[..]).await.map_err(|e| {
             println!("Error writing file: {:?}. Error: {}", target_filepath, e);
-            DownloadJobError::ShouldRetry(video.clone())
+            DownloadJobError::ShouldRetry(job.clone())
         })?;
         total_size += chunk.len();
 
@@ -233,7 +239,7 @@ async fn download_job_task(
         let err_msg = &format!("Got hash: {hash}. Expected: {}", video.sha256);
         translate_error(ctx.db.set_download_failed(video.id, err_msg).await)?;
         println!("{}", err_msg);
-        return Err(DownloadJobError::ShouldRetry(video.clone()));
+        return Err(DownloadJobError::ShouldRetry(job.clone()));
     }
 
     translate_error(ctx.db.set_downloaded(video.id, &target_filepath).await)?;
@@ -246,7 +252,7 @@ pub mod test {
     use std::{str::FromStr, sync::Arc, time::Duration};
 
     use crate::{
-        cfg::{DbConfig, DownloaderConfig},
+        cfg::{DbConfig, DownloaderConfig, RetryParams},
         downloader::backend::{self, Backend},
         manifest::{ManifestFile, Section, Version, Video},
     };
@@ -375,7 +381,11 @@ pub mod test {
         let downloader_config = Arc::new(DownloaderConfig {
             concurrent_downloads: 2,
             content_path: content_path.path().to_path_buf(),
-            initial_backoff: Duration::from_millis(100),
+            retry_params: RetryParams {
+                initial_backoff: Duration::from_millis(100),
+                backoff_factor: 1.0,
+                max_backoff: Duration::from_millis(100),
+            },
             remote_server: "/Invalid".try_into().unwrap(),
             update_interval: Duration::from_secs(300),
         });
@@ -450,7 +460,8 @@ pub mod test {
         }
 
         async fn fetch_manifest(&self) -> std::result::Result<Vec<u8>, crate::downloader::Error> {
-            todo!()
+            // Not needed for these tests
+            unimplemented!()
         }
     }
 
@@ -541,14 +552,17 @@ pub mod test {
 
         let result = download_job_task(
             ctx.download_ctx.clone(),
-            Video {
-                name: "Quadratic equations".to_string(),
-                id,
-                uri: "s3://bucket/quadratic-equations.mp4".parse().or_fail()?,
-                sha256: "8f9e3a4ae7d86c4abdf731a947fc90b607b82a0362da0b312e3b644defedb81f"
-                    .try_into()
-                    .or_fail()?,
-                file_size: 123457,
+            Job {
+                backoff_time: ctx.download_ctx.config.retry_params.initial_backoff,
+                video: Video {
+                    name: "Quadratic equations".to_string(),
+                    id,
+                    uri: "s3://bucket/quadratic-equations.mp4".parse().or_fail()?,
+                    sha256: "8f9e3a4ae7d86c4abdf731a947fc90b607b82a0362da0b312e3b644defedb81f"
+                        .try_into()
+                        .or_fail()?,
+                    file_size: 123457,
+                },
             },
         )
         .await;
@@ -556,7 +570,10 @@ pub mod test {
         assert_that!(
             result,
             err(matches_pattern!(DownloadJobError::ShouldRetry(
-                matches_pattern!(Video { id: &id, .. })
+                matches_pattern!(Job {
+                    video: matches_pattern!(Video { id: &id, .. }),
+                    backoff_time: &ctx.download_ctx.config.retry_params.initial_backoff,
+                })
             )))
         );
 
@@ -597,14 +614,17 @@ pub mod test {
 
         let result = download_job_task(
             ctx.download_ctx.clone(),
-            Video {
-                name: name.clone(),
-                id,
-                uri,
-                sha256: "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a"
-                    .try_into()
-                    .or_fail()?,
-                file_size: 4,
+            Job {
+                backoff_time: ctx.download_ctx.config.retry_params.initial_backoff,
+                video: Video {
+                    name: name.clone(),
+                    id,
+                    uri,
+                    sha256: "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a"
+                        .try_into()
+                        .or_fail()?,
+                    file_size: 4,
+                },
             },
         )
         .await;
@@ -655,14 +675,17 @@ pub mod test {
 
         let result = download_job_task(
             ctx.download_ctx.clone(),
-            Video {
-                name: name.clone(),
-                id,
-                uri,
-                sha256: "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a"
-                    .try_into()
-                    .or_fail()?,
-                file_size: 4,
+            Job {
+                backoff_time: ctx.download_ctx.config.retry_params.initial_backoff,
+                video: Video {
+                    name: name.clone(),
+                    id,
+                    uri,
+                    sha256: "9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a"
+                        .try_into()
+                        .or_fail()?,
+                    file_size: 4,
+                },
             },
         )
         .await;
@@ -670,7 +693,10 @@ pub mod test {
         assert_that!(
             result,
             err(matches_pattern!(DownloadJobError::ShouldRetry(
-                matches_pattern!(Video { id: &id, .. })
+                matches_pattern!(Job {
+                    video: matches_pattern!(Video { id: &id, .. }),
+                    backoff_time: &ctx.download_ctx.config.retry_params.initial_backoff,
+                })
             )))
         );
 

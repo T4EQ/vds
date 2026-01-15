@@ -8,8 +8,12 @@ busy_timeout = "10 seconds"
 concurrent_downloads = 8
 content_path = "/tmp/vds/content_path"
 remote_server = "/tmp/vds/fake_remote_server"
-initial_backoff = "5 seconds"
 update_interval = "20 seconds"
+
+[downloader_config.retry_params]
+initial_backoff = "5 seconds"
+backoff_factor = 1.5
+max_backoff = "2 hours"
 
 [http_config]
 listen_address = "127.0.0.1"
