@@ -1,5 +1,6 @@
 use actix_web::{App, HttpServer, web};
 use anyhow::Context;
+use tokio::sync::mpsc;
 
 use std::{net::TcpListener, sync::Arc};
 
@@ -14,16 +15,26 @@ mod manifest;
 mod static_files;
 
 pub async fn run_app(listener: TcpListener, config: VdsConfig) -> anyhow::Result<()> {
-    let database = db::Database::open(config.db_config)
-        .await
-        .context("While initializing database")?;
+    let database = Arc::new(
+        db::Database::open(config.db_config)
+            .await
+            .context("While initializing database")?,
+    );
 
     database.apply_pending_migrations().await?;
 
-    let database = web::Data::new(database);
+    let (user_command_sender, user_command_receiver) = mpsc::unbounded_channel();
 
-    let downloader_fut =
-        downloader::run_downloader(config.downloader_config, Arc::clone(&*database));
+    let downloader_fut = downloader::run_downloader(
+        config.downloader_config,
+        Arc::clone(&database),
+        user_command_receiver,
+    );
+
+    let database = web::Data::new(api::ApiData::new(
+        Arc::clone(&database),
+        user_command_sender,
+    ));
 
     let server = HttpServer::new({
         let database = database.clone();
@@ -44,7 +55,7 @@ pub async fn run_app(listener: TcpListener, config: VdsConfig) -> anyhow::Result
         }
         server = server => {
             server?;
-            // the server can exit due to SIGINT. Using joing for these 2 futures would not
+            // the server can exit due to SIGINT. Using join for these 2 futures would not
             // terminate the application because downloader would keep running indefinitely
         }
     };

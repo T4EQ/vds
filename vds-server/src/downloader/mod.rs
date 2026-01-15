@@ -6,6 +6,15 @@ use std::{path::PathBuf, sync::Arc};
 use crate::{cfg::DownloaderConfig, db::Database};
 use backend::FileBackend;
 
+use tokio::sync::mpsc::UnboundedReceiver;
+
+/// Commands received from users
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum UserCommand {
+    /// User request to trigger an immediate manifest fetch
+    FetchManifest,
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("I/O error reading from backend: {0}")]
@@ -87,18 +96,22 @@ async fn check_updates(
     Ok(())
 }
 
-pub async fn run_downloader(config: DownloaderConfig, db: Arc<Database>) -> anyhow::Result<()> {
+pub async fn run_downloader(
+    config: DownloaderConfig,
+    db: Arc<Database>,
+    mut cmd_receiver: UnboundedReceiver<UserCommand>,
+) -> anyhow::Result<()> {
     let config = Arc::new(config);
 
     // The backend can be either a local file path or an S3 bucket. We allow local filepaths
     // for simple testing of the server.
     let backend: Arc<dyn backend::Backend> = match config.remote_server.scheme_str() {
         // If we don't have a scheme, we assume it is a file path
-        None | Some("file://") => {
+        None | Some("file") => {
             let path: PathBuf = config.remote_server.path().into();
             Arc::new(FileBackend::new(&path))
         }
-        Some("s3://") => {
+        Some("s3") => {
             // We will hook up the S3Backend here, once available.
             unimplemented!()
         }
@@ -127,7 +140,17 @@ pub async fn run_downloader(config: DownloaderConfig, db: Arc<Database>) -> anyh
     }
 
     loop {
-        tokio::time::sleep(download_context.config.update_interval).await;
+        let mut wait = std::pin::pin!(tokio::time::sleep(download_context.config.update_interval));
+        let cmd = tokio::select! {
+            _ = &mut wait => { None }
+            command = cmd_receiver.recv() => {
+                command
+            }
+        };
+
+        if let Some(UserCommand::FetchManifest) = cmd {
+            println!("Handling user-requested fetch");
+        }
 
         check_updates(download_context.clone(), &mut pending_task).await?;
     }
