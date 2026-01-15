@@ -1,7 +1,6 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 
-use crate::pages::admin::AdminPage;
 use crate::pages::player::VideoPlayer;
 use crate::pages::video_list::VideoList;
 
@@ -9,8 +8,6 @@ use crate::pages::video_list::VideoList;
 pub enum Route {
     #[at("/")]
     Home,
-    #[at("/admin")]
-    Admin,
     #[at("/player/:id")]
     Player { id: String },
 }
@@ -21,12 +18,6 @@ fn switch(route: Route) -> Html {
             html! {
                 <VideoList>
                 </VideoList>
-            }
-        }
-        Route::Admin => {
-            html! {
-                <AdminPage>
-                </AdminPage>
             }
         }
         Route::Player { id } => {
