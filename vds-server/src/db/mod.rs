@@ -29,10 +29,19 @@ pub enum Error {
     InvalidUUID(#[from] uuid::Error),
     #[error("Error saving manifest: {0:?}")]
     ManifestSaveFailed(std::io::Error),
+    #[error("A video is not present in the DB but it is present in the manifest: {0}")]
+    MissingVideoInDb(uuid::Uuid),
+    #[error("The video being deleted is still present in the manifest: {0}")]
+    VideoIsStillInManifest(uuid::Uuid),
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
 
+/// An abstraction over:
+/// - An sqlite database that handles the video status information.
+/// - A manifest file saved directly in fs storage. This was simpler
+///   than coercing the manifest data into the database, which is complex
+///   due to the amount of tables that it would require (due to normalization).
 pub struct Database {
     config: DbConfig,
     pool: Pool<Manager<diesel::sqlite::SqliteConnection>>,
@@ -41,12 +50,14 @@ pub struct Database {
 }
 
 impl Database {
+    /// Opens the database using the given configuration. Returns an error if the
+    /// database could not be opened. Also loads the manifest file from storage.
     pub async fn open(config: DbConfig) -> Result<Self> {
         let url = config.db_path();
         let url = url.to_string_lossy();
         let manager = Manager::new(url, deadpool_diesel::Runtime::Tokio1);
         let pool: Pool<Manager<_>> = Pool::builder(manager)
-            .max_size(16)
+            .max_size(config.pool_size)
             .post_create(deadpool_diesel::sqlite::Hook::sync_fn(move |c, _m| {
                 let mut c = c.lock().expect("poisoned mutex");
                 c.batch_execute("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")
@@ -75,6 +86,12 @@ impl Database {
         })
     }
 
+    /// The database may not yet exist on disk, or may have a format from previous versions of this
+    /// software. Diesel manages database migrations for us and allows us to apply any pending
+    /// migrations to the database so that we do not have to carry out these actions manually.
+    ///
+    /// This function performs any pending migrations, for either a non-existent database (being
+    /// created now) or a database from a previous version of the software.
     pub async fn apply_pending_migrations(&self) -> Result<()> {
         let connection = self.pool.get().await?;
         connection
@@ -87,6 +104,8 @@ impl Database {
             .expect("Unexpected panic of a background DB thread")
     }
 
+    /// Saves the manifest file to disk, at the location indicated by the `runtime_path` in the
+    /// `db_config` section of the database configuration.
     pub async fn save_manifest_to_disk(&self, manifest_data: &[u8]) -> Result<()> {
         // We follow a two-step approach here to prevent partial manifests being written to disk.
         // In the first step we write the manifest to a temporary path. This operation is assumed to be
@@ -110,6 +129,10 @@ impl Database {
         Ok(())
     }
 
+    /// Publishes a manifest to make it available for the currently running software. For
+    /// concurrency issues (to prevent a manifest which does not yet contain corresponding video
+    /// entries in the database) this is decoupled from saving the manifest to disk, which can
+    /// occur earlier (to ensure that the next boot uses the new manifest).
     pub async fn publish_manifest(&self, manifest_data: &ManifestFile) {
         self.current_manifest
             .write()
@@ -117,6 +140,8 @@ impl Database {
             .replace(manifest_data.clone());
     }
 
+    /// Returns a the current manifest. The manifest will not be written until all read handles are
+    /// dropped, so do not keep them for long periods of time.
     pub async fn current_manifest<'a, 's>(
         &'s self,
     ) -> tokio::sync::RwLockReadGuard<'a, Option<ManifestFile>>
@@ -126,6 +151,8 @@ impl Database {
         self.current_manifest.read().await
     }
 
+    /// Returns the current manifest content divided by sections and ordered in the same way as the
+    /// manifest (for both the sections and the videos within a section).
     pub async fn current_manifest_sections(&self) -> Result<Vec<(String, Vec<Video>)>> {
         let manifest_sections = self
             .current_manifest
@@ -141,7 +168,7 @@ impl Database {
             .collect();
 
         let connection = self.pool.get().await?;
-        let videos: Vec<Video> = connection
+        let videos_from_db: Vec<Video> = connection
             .interact(move |conn| -> Result<Vec<Video>> {
                 use schema::videos::dsl;
 
@@ -153,20 +180,28 @@ impl Database {
             .await
             .expect("Unexpected panic of a background DB thread")?;
 
-        Ok(manifest_sections
+        manifest_sections
             .into_iter()
             .map(|s| {
-                let in_section = |id| s.content.iter().any(|v| v.id == id);
-                let videos = videos
+                s.content
                     .iter()
-                    .filter(|v| in_section(v.id))
-                    .cloned()
-                    .collect();
-                (s.name, videos)
+                    .map(|v| {
+                        // Here we need to order the videos as in the manifes section.
+                        // This is the reason why we can't just filter the videos matching relevant
+                        // ids.
+                        videos_from_db
+                            .iter()
+                            .find(|inner| inner.id == v.id)
+                            .cloned()
+                            .ok_or_else(|| Error::MissingVideoInDb(v.id))
+                    })
+                    .collect::<Result<Vec<Video>>>()
+                    .map(|inner| (s.name, inner))
             })
-            .collect())
+            .collect()
     }
 
+    /// Returns a list of all the videos in the database.
     pub async fn list_all_videos(&self) -> Result<Vec<Video>> {
         let connection = self.pool.get().await?;
         connection
@@ -180,6 +215,7 @@ impl Database {
             .expect("Unexpected panic of a background DB thread")
     }
 
+    /// Finds a video by UUID
     pub async fn find_video(&self, req_id: uuid::Uuid) -> Result<Video> {
         let req_id = req_id.to_string();
 
@@ -198,11 +234,27 @@ impl Database {
             .expect("Unexpected panic of a background DB thread")
     }
 
+    /// Deletes a video from the database. Ensure that this video is no longer referenced in the
+    /// new manifest before deleting it, or this method will error.
     pub async fn delete_video(&self, req_id: uuid::Uuid) -> Result<()> {
         use schema::videos::dsl::*;
 
-        let req_id = req_id.to_string();
+        let is_in_manifest = self
+            .current_manifest
+            .read()
+            .await
+            .as_ref()
+            .is_some_and(|m| {
+                m.sections
+                    .iter()
+                    .flat_map(|s| s.content.iter())
+                    .any(|v| v.id == req_id)
+            });
+        if is_in_manifest {
+            return Err(Error::VideoIsStillInManifest(req_id));
+        }
 
+        let req_id = req_id.to_string();
         let connection = self.pool.get().await?;
         connection
             .interact(move |c| {
@@ -213,6 +265,8 @@ impl Database {
             .expect("Unexpected panic of a background DB thread")
     }
 
+    /// Inserts a new video into the database. Will return an error if the video is already
+    /// present. Initializes the rest of the fields to default values.
     pub async fn insert_video(&self, id: uuid::Uuid, name: &str, file_size: u64) -> Result<()> {
         let id = id.to_string();
         let new_vid = models::NewVideo {
@@ -233,6 +287,7 @@ impl Database {
             .expect("Unexpected panic of a background DB thread")
     }
 
+    /// Increments the viewed count for a given video.
     pub async fn increment_view_count(&self, req_id: uuid::Uuid) -> Result<Video> {
         let connection = self.pool.get().await?;
         connection
@@ -247,6 +302,8 @@ impl Database {
             .expect("Unexpected panic of a background DB thread")
     }
 
+    /// Updates the download progress for a given video. `downloaded_size` should be
+    /// smaller than the file size of the video.
     pub async fn update_download_progress(
         &self,
         req_id: uuid::Uuid,
@@ -269,6 +326,7 @@ impl Database {
             .expect("Unexpected panic of a background DB thread")
     }
 
+    /// Marks the given video as failed with the given error message.
     pub async fn set_download_failed(&self, req_id: uuid::Uuid, message: &str) -> Result<()> {
         let message = message.to_string(); // Need a copy since interact runs on a separate thread
         // and requires 'static.
@@ -289,6 +347,7 @@ impl Database {
             .expect("Unexpected panic of a background DB thread")
     }
 
+    /// Marks the given video as downloaded, at the given file path.
     pub async fn set_downloaded(&self, req_id: uuid::Uuid, file_path: &Path) -> Result<()> {
         let file_path = file_path.as_os_str().to_owned(); // Need a copy since interact runs on a separate thread
         // and requires 'static.
@@ -325,6 +384,7 @@ mod test {
         DbConfig {
             busy_timeout: Duration::from_secs(2),
             runtime_path: runtime_path.into(),
+            pool_size: 16,
         }
     }
 
@@ -496,6 +556,140 @@ mod test {
                 view_count: 0
             })
         );
+
+        Ok(())
+    }
+
+    fn manifest_for_test() -> googletest::Result<ManifestFile> {
+        Ok(ManifestFile {
+            name: "manifest".to_string(),
+            date: chrono::NaiveDate::from_str("2025-10-10").or_fail()?,
+            version: crate::manifest::Version {
+                major: 2,
+                minor: 0,
+                revision: 0,
+            },
+            sections: vec![
+                crate::manifest::Section {
+                    name: "".to_string(),
+                    content: vec![
+                        crate::manifest::Video {
+                            name: "Linear equations".to_string(),
+                            id: uuid::Uuid::from_str("bf978778-1c5d-44b3-b2c1-1cc253563799")
+                                .or_fail()?,
+                            uri: "s3://bucket/linear-equations.mp4".parse().or_fail()?,
+                            sha256:
+                                "0b88b2dec2be5e2ef74022ef6a8023232e28374d67e917b76f9bb607e691f327"
+                                    .try_into()
+                                    .or_fail()?,
+                            file_size: 123456,
+                        },
+                        crate::manifest::Video {
+                            name: "Quadratic equations".to_string(),
+                            id: uuid::Uuid::from_str("5eb9e089-79cf-478d-9121-9ca3e7bb1d4a")
+                                .or_fail()?,
+                            uri: "s3://bucket/quadratic-equations.mp4".parse().or_fail()?,
+                            sha256:
+                                "8f9e3a4ae7d86c4abdf731a947fc90b607b82a0362da0b312e3b644defedb81f"
+                                    .try_into()
+                                    .or_fail()?,
+                            file_size: 123457,
+                        },
+                    ],
+                },
+                crate::manifest::Section {
+                    name: "Integration".to_string(),
+                    content: vec![
+                        crate::manifest::Video {
+                            name: "Riemann sum".to_string(),
+                            id: uuid::Uuid::from_str("eddb4450-a9ff-4a4b-ad81-2a8b78998405")
+                                .or_fail()?,
+                            uri: "s3://bucket/riemann-sum.mp4".parse().or_fail()?,
+                            sha256:
+                                "a6d3b80cd14f78b21ffbf5995bbda38ad8834459557782d245ed720134d36fc4"
+                                    .try_into()
+                                    .or_fail()?,
+                            file_size: 123459,
+                        },
+                        crate::manifest::Video {
+                            name: "List of integrals".to_string(),
+                            id: uuid::Uuid::from_str("f47e6cdc-1bcf-439a-9ea4-038dc7153648")
+                                .or_fail()?,
+                            uri: "s3://bucket/list-of-integrals.mp4".parse().or_fail()?,
+                            sha256:
+                                "98780990e94fb55d0b88ebcd78fe82f069eac547731a4b0822332d826c970aec"
+                                    .try_into()
+                                    .or_fail()?,
+                            file_size: 123460,
+                        },
+                    ],
+                },
+            ],
+        })
+    }
+
+    #[tokio::test]
+    #[googletest::test]
+    async fn test_save_manifest_to_disk() -> googletest::Result<()> {
+        let tempdir = TempDir::new().or_fail()?;
+        let db_config = create_dbconfig(tempdir.path());
+        let db = Database::open(db_config.clone()).await.or_fail()?;
+        db.apply_pending_migrations().await.or_fail()?;
+
+        let manifest = manifest_for_test()?;
+        let manifest_data = serde_json::to_vec(&manifest).or_fail()?;
+        db.save_manifest_to_disk(&manifest_data[..])
+            .await
+            .or_fail()?;
+
+        drop(manifest_data);
+
+        let manifest_data = tokio::fs::read(db_config.manifest_path()).await.or_fail()?;
+        let stored_manifest: ManifestFile = serde_json::from_slice(&manifest_data[..]).or_fail()?;
+
+        assert_that!(stored_manifest, eq(&manifest));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[googletest::test]
+    async fn test_current_manifest_sections() -> googletest::Result<()> {
+        let tempdir = TempDir::new().or_fail()?;
+        let db_config = create_dbconfig(tempdir.path());
+        let db = Database::open(db_config.clone()).await.or_fail()?;
+        db.apply_pending_migrations().await.or_fail()?;
+
+        let manifest = manifest_for_test()?;
+        db.publish_manifest(&manifest).await;
+
+        // Create db entries for each video
+        for video in manifest.sections.iter().flat_map(|s| &s.content) {
+            db.insert_video(video.id, &video.name, video.file_size)
+                .await
+                .or_fail()?;
+        }
+
+        let sections = db.current_manifest_sections().await.or_fail()?;
+
+        assert_that!(sections.len(), eq(manifest.sections.len()));
+        for ((name, content), manifest_section) in sections.iter().zip(manifest.sections) {
+            expect_that!(name, eq(&manifest_section.name));
+            expect_that!(content.len(), eq(manifest_section.content.len()));
+
+            for (video, manifest_video) in content.iter().zip(manifest_section.content) {
+                expect_that!(
+                    video,
+                    matches_pattern!(Video {
+                        id: eq(&manifest_video.id),
+                        name: eq(&manifest_video.name),
+                        file_size: eq(&manifest_video.file_size),
+                        download_status: eq(&DownloadStatus::Pending),
+                        view_count: eq(&0),
+                    })
+                );
+            }
+        }
 
         Ok(())
     }

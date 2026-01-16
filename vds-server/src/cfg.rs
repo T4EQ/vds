@@ -66,6 +66,10 @@ pub struct DbConfig {
     #[serde(with = "humantime_serde")]
     pub busy_timeout: std::time::Duration,
 
+    /// The number of connections that are created for the database. Limits the amount of
+    /// concurrent database connections.
+    pub pool_size: usize,
+
     /// The path where the database contents are stored
     pub runtime_path: PathBuf,
 }

@@ -3,6 +3,7 @@ debug = true
 [db_config]
 runtime_path = "/tmp/vds/runtime_path"
 busy_timeout = "10 seconds"
+pool_size = 16
 
 [downloader_config]
 concurrent_downloads = 8
