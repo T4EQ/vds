@@ -394,6 +394,7 @@ pub mod test {
         let db_config = DbConfig {
             busy_timeout: Duration::from_secs(2),
             runtime_path: runtime_path.path().to_path_buf(),
+            pool_size: 16,
         };
 
         let db = Arc::new(Database::open(db_config).await.unwrap());
