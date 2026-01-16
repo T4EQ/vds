@@ -1,8 +1,9 @@
 use yew::prelude::*;
 use yew_router::prelude::*;
 
+use crate::context::ContentProvider;
+use crate::pages::dashboard::Dashboard;
 use crate::pages::player::VideoPlayer;
-use crate::pages::video_list::VideoList;
 
 #[derive(Debug, Clone, PartialEq, Routable)]
 pub enum Route {
@@ -16,8 +17,8 @@ fn switch(route: Route) -> Html {
     match route {
         Route::Home => {
             html! {
-                <VideoList>
-                </VideoList>
+                <Dashboard>
+                </Dashboard>
             }
         }
         Route::Player { id } => {
@@ -32,8 +33,10 @@ fn switch(route: Route) -> Html {
 #[function_component(App)]
 pub fn app() -> Html {
     html! {
-        <BrowserRouter>
-            <Switch<Route> render={switch} />
-        </BrowserRouter>
+        <ContentProvider>
+            <BrowserRouter>
+                <Switch<Route> render={switch} />
+            </BrowserRouter>
+        </ContentProvider>
     }
 }

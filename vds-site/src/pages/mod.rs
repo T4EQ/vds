@@ -1,2 +1,2 @@
+pub mod dashboard;
 pub mod player;
-pub mod video_list;
