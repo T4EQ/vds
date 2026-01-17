@@ -11,6 +11,7 @@
 
   outputs =
     {
+      self,
       nixpkgs,
       rust-overlay,
       ...
@@ -30,6 +31,11 @@
       vdsPackageWithPkgs =
         pkgs: targetPkgs:
         let
+          # Get git revision. Nix removes the .git repository when building so that the build reproducibility
+          # does not get affected. Luckily, it also provides a way for us to get the revision from the flake
+          # itself.
+          git-rev = "${self.rev or self.dirtyRev or "Unknown"}";
+
           # The site is cross compiled using trunk and wasm. That's why we can build it with the
           # host toolchain, which already has support for wasm. However, the same is not true for
           # the target toolchain (aarch64-unknown-linux-musl), so we need to use a nix cross-compilation
@@ -87,6 +93,7 @@
             pushd vds-server
             export VDS_SERVER_FRONTEND_PATH=${site}/dist
             export CARGO_TARGET_DIR=$(pwd)/../target
+            export VDS_SERVER_NIX_GIT_REVISION=${git-rev}
             cargo build --release --offline -j $NIX_BUILD_CORES --target ${targetPkgs.stdenv.hostPlatform.rust.rustcTarget}
             popd
             runHook postBuild
