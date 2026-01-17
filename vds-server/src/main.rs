@@ -20,18 +20,28 @@ fn default_config_path() -> PathBuf {
 pub mod build_info {
     std::include!(std::concat!(std::env!("OUT_DIR"), "/built.rs"));
 
-    pub fn print_version_info() {
-        println!("{PKG_NAME}:");
-        println!("\tVersion: {PKG_VERSION}");
-        if let Some(git_hash) = GIT_COMMIT_HASH {
+    #[cfg(feature = "git2")]
+    fn git_hash() -> Option<String> {
+        GIT_COMMIT_HASH.map(|git_hash| {
             let dirty = if GIT_DIRTY.is_some_and(|v| v) {
                 "-dirty"
             } else {
                 ""
             };
-            println!("\tGit hash: {git_hash}{dirty}");
-        } else if let Some(hash) = std::option_env!("VDS_SERVER_NIX_GIT_REVISION") {
-            println!("\tGit hash: {hash}");
+            format!("{git_hash}{dirty}")
+        })
+    }
+
+    #[cfg(not(feature = "git2"))]
+    fn git_hash() -> Option<String> {
+        std::option_env!("VDS_SERVER_NIX_GIT_REVISION").map(|git_hash| git_hash.to_string())
+    }
+
+    pub fn print_version_info() {
+        println!("{PKG_NAME}:");
+        println!("\tVersion: {PKG_VERSION}");
+        if let Some(git_hash) = git_hash() {
+            println!("\tGit hash: {git_hash}");
         } else {
             println!("\tGit hash: Unknown");
         }
