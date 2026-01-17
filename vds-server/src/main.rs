@@ -38,6 +38,10 @@ pub mod build_info {
                 ""
             };
             println!("\tGit hash: {git_hash}{dirty}");
+        } else if let Some(hash) = std::option_env!("VDS_SERVER_NIX_GIT_REVISION") {
+            println!("\tGit hash: {hash}");
+        } else {
+            println!("\tGit hash: unknown");
         }
     }
 }
