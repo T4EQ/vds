@@ -85,7 +85,6 @@
 
           nativeBuildInputs = [
             pkgs.lld
-            pkgs.breakpointHook
           ];
 
           buildPhase = "
@@ -94,7 +93,7 @@
             export VDS_SERVER_FRONTEND_PATH=${site}/dist
             export CARGO_TARGET_DIR=$(pwd)/../target
             export VDS_SERVER_NIX_GIT_REVISION=${git-rev}
-            cargo build --release --offline -j $NIX_BUILD_CORES --target ${targetPkgs.stdenv.hostPlatform.rust.rustcTarget}
+            cargo build --release --offline -j $NIX_BUILD_CORES --target ${targetPkgs.stdenv.hostPlatform.rust.rustcTarget} --no-default-features
             popd
             runHook postBuild
           ";

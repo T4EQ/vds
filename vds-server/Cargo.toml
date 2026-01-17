@@ -8,6 +8,10 @@ authors = ["Javier Alvarez <javier.alvarez@allthingsembedded.net>", "Johannes Fr
 homepage = "https://github.com/t4eq/vds"
 repository = "https://github.com/t4eq/vds"
 
+[features]
+default = ["git2"]
+git2 = ["built/git2"]
+
 [dependencies]
 actix-web-static-files.workspace = true
 actix-web.workspace = true
