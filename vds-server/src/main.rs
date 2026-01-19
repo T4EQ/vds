@@ -17,55 +17,35 @@ fn default_config_path() -> PathBuf {
     "/var/lib/vds/config/config.toml".into()
 }
 
-pub mod build_info {
-    std::include!(std::concat!(std::env!("OUT_DIR"), "/built.rs"));
-
-    #[cfg(feature = "git2")]
-    fn git_hash() -> Option<String> {
-        GIT_COMMIT_HASH.map(|git_hash| {
-            let dirty = if GIT_DIRTY.is_some_and(|v| v) {
-                "-dirty"
-            } else {
-                ""
-            };
-            format!("{git_hash}{dirty}")
-        })
+fn print_version_info() {
+    let info = vds_server::build_info::get();
+    println!("{}:", info.name);
+    println!("\tVersion: {}", info.version);
+    if let Some(git_hash) = &info.git_hash {
+        println!("\tGit hash: {git_hash}");
+    } else {
+        println!("\tGit hash: Unknown");
     }
-
-    #[cfg(not(feature = "git2"))]
-    fn git_hash() -> Option<String> {
-        std::option_env!("VDS_SERVER_NIX_GIT_REVISION").map(|git_hash| git_hash.to_string())
+    println!("\tAuthors:");
+    for author in info.authors.split(':') {
+        let author = author.trim();
+        println!("\t\t{author}");
     }
-
-    pub fn print_version_info() {
-        println!("{PKG_NAME}:");
-        println!("\tVersion: {PKG_VERSION}");
-        if let Some(git_hash) = git_hash() {
-            println!("\tGit hash: {git_hash}");
-        } else {
-            println!("\tGit hash: Unknown");
-        }
-        println!("\tAuthors:");
-        for author in PKG_AUTHORS.split(':') {
-            let author = author.trim();
-            println!("\t\t{author}");
-        }
-        println!("\tHomepage: {PKG_HOMEPAGE}");
-        println!("\tLicense: {PKG_LICENSE}");
-        println!("\tRepository: {PKG_REPOSITORY}");
-        println!();
-        println!("Build info:");
-        println!("\tProfile: {PROFILE}");
-        println!("\trustc version: {RUSTC_VERSION}");
-        println!("\tFeatures: {FEATURES_STR}");
-    }
+    println!("\tHomepage: {}", info.homepage);
+    println!("\tLicense: {}", info.license);
+    println!("\tRepository: {}", info.repository);
+    println!();
+    println!("Build info:");
+    println!("\tProfile: {}", info.profile);
+    println!("\trustc version: {}", info.rustc_version);
+    println!("\tFeatures: {}", info.features);
 }
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     if args.version {
-        build_info::print_version_info();
+        print_version_info();
         return Ok(());
     }
     let config = vds_server::cfg::get_config(&args.config.unwrap_or_else(default_config_path))?;

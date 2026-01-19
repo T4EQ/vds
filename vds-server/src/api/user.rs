@@ -30,6 +30,12 @@ impl From<crate::db::Video> for LocalVideoMeta {
     }
 }
 
+#[get("/version")]
+async fn get_version() -> impl Responder {
+    let info = crate::build_info::get();
+    HttpResponse::Ok().json(info)
+}
+
 #[get("/content/meta")]
 async fn list_content_metadata(api_data: web::Data<ApiData>) -> impl Responder {
     use vds_api::api::content::meta::get::Response;
