@@ -6,6 +6,7 @@ use std::{net::TcpListener, sync::Arc};
 
 use crate::cfg::VdsConfig;
 
+pub mod build_info;
 pub mod cfg;
 pub mod db;
 
