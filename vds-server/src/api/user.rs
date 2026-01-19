@@ -3,6 +3,7 @@ use actix_web::{
     web::{self, Bytes, BytesMut},
 };
 use tokio::io::AsyncReadExt;
+use tracing::instrument::Instrument;
 
 use vds_api::api::content::meta::get::{GroupedSection, LocalVideoMeta, Progress, VideoStatus};
 
@@ -33,23 +34,44 @@ impl From<crate::db::Video> for LocalVideoMeta {
     }
 }
 
+#[tracing::instrument(
+    fields(
+        request_id = %uuid::Uuid::new_v4(),
+    )
+)]
 #[get("/version")]
 async fn get_version() -> impl Responder {
     let info = crate::build_info::get();
     HttpResponse::Ok().json(info)
 }
 
+#[tracing::instrument(
+    skip(api_data)
+    fields(
+        request_id = %uuid::Uuid::new_v4(),
+    )
+)]
 #[get("/content/meta")]
 async fn list_content_metadata(api_data: web::Data<ApiData>) -> impl Responder {
     use vds_api::api::content::meta::get::Response;
 
-    let sections = match api_data.db.current_manifest_sections().await {
+    let sections = match api_data
+        .db
+        .current_manifest_sections()
+        .instrument(tracing::info_span!(
+            "Querying manifest information from database"
+        ))
+        .await
+    {
         Ok(sections) => sections,
         Err(e) => {
             return HttpResponse::InternalServerError()
                 .body(format!("Unexpected error querying content list: {e:?}"));
         }
     };
+
+    let _span =
+        tracing::info_span!("Collecting manifest information as /content/meta response").entered();
 
     let videos = sections
         .into_iter()
@@ -62,6 +84,13 @@ async fn list_content_metadata(api_data: web::Data<ApiData>) -> impl Responder {
     HttpResponse::Ok().json(Response { videos })
 }
 
+#[tracing::instrument(
+    skip(api_data)
+    fields(
+        request_id = %uuid::Uuid::new_v4(),
+        %id
+    )
+)]
 #[get("/content/meta/{id}")]
 async fn content_metadata_for_id(
     api_data: web::Data<ApiData>,
@@ -72,10 +101,16 @@ async fn content_metadata_for_id(
         return HttpResponse::BadRequest().body("Invalid video ID");
     };
 
-    let meta = match api_data.db.find_video(id).await {
+    let meta = match api_data
+        .db
+        .find_video(id)
+        .instrument(tracing::info_span!("Obtaining video information from DB"))
+        .await
+    {
         Ok(meta) => Some(meta.into()),
         Err(crate::db::Error::Diesel(diesel::result::Error::NotFound)) => None,
         Err(err) => {
+            tracing::error!("The database failed with code: {err}");
             return HttpResponse::InternalServerError()
                 .body(format!("Error querying the video from database: {err}"));
         }
@@ -84,27 +119,41 @@ async fn content_metadata_for_id(
     HttpResponse::Ok().json(Response { meta })
 }
 
+#[tracing::instrument(
+    skip(api_data)
+    fields(
+        request_id = %uuid::Uuid::new_v4(),
+        %id
+    )
+)]
 #[get("/content/{id}")]
 async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> impl Responder {
     let Ok(id) = id.into_inner().try_into() else {
-        return HttpResponse::BadRequest().body("Invalid video ID");
+        let msg = "Invalid video ID";
+        tracing::error!(msg);
+        return HttpResponse::BadRequest().body(msg);
     };
     let Ok(crate::db::Video {
         download_status: crate::db::DownloadStatus::Downloaded(filepath),
         ..
     }) = api_data.db.find_video(id).await
     else {
-        return HttpResponse::NotFound().body("Requested video ID is not available");
+        let msg = "Requested video ID is not available";
+        tracing::error!(msg);
+        return HttpResponse::NotFound().body(msg);
     };
 
     let mut file = match tokio::fs::File::open(filepath).await {
         Ok(file) => file,
         Err(e) if e.kind() == tokio::io::ErrorKind::NotFound => {
-            return HttpResponse::InternalServerError().body("Requested video is not on disk");
+            let msg = "Requested video is not on disk";
+            tracing::error!(msg);
+            return HttpResponse::InternalServerError().body(msg);
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-                .body(format!("Unexpected error opening file: {e:?}"));
+            let msg = format!("Unexpected error opening file: {e:?}");
+            tracing::error!(msg);
+            return HttpResponse::InternalServerError().body(msg);
         }
     };
 
@@ -121,7 +170,9 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
             // in size, and we only have 1 GiB of RAM for the entire platform.
             let mut bytes = BytesMut::with_capacity(RESPONSE_CHUNK_SIZE);
             let Ok(n) = file.read_buf(&mut bytes).await else {
-                yield Err::<Bytes, anyhow::Error>(anyhow::anyhow!("Unable to read data from file"));
+                let msg = "Unable to read data from file";
+                tracing::error!(msg);
+                yield Err::<Bytes, anyhow::Error>(anyhow::anyhow!(msg));
                 return;
             };
             if n == 0 {
@@ -137,6 +188,13 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
         .streaming(Box::pin(s))
 }
 
+#[tracing::instrument(
+    skip(api_data)
+    fields(
+        request_id = %uuid::Uuid::new_v4(),
+        %id
+    )
+)]
 #[post("/content/{id}/view")]
 async fn increment_view_cnt(api_data: web::Data<ApiData>, id: web::Path<String>) -> impl Responder {
     let Ok(id) = id.into_inner().try_into() else {
@@ -147,11 +205,19 @@ async fn increment_view_cnt(api_data: web::Data<ApiData>, id: web::Path<String>)
         ..
     }) = api_data.db.increment_view_count(id).await
     else {
-        return HttpResponse::NotFound().body("Requested video ID is not available");
+        let msg = "Requested video ID is not available";
+        tracing::error!(msg);
+        return HttpResponse::NotFound().body(msg);
     };
     HttpResponse::Ok().finish()
 }
 
+#[tracing::instrument(
+    skip(api_data)
+    fields(
+        request_id = %uuid::Uuid::new_v4(),
+    )
+)]
 #[get("/manifest/latest")]
 async fn get_manifest(api_data: web::Data<ApiData>) -> impl Responder {
     let manifest = api_data.db.current_manifest().await;
@@ -166,12 +232,20 @@ async fn get_manifest(api_data: web::Data<ApiData>) -> impl Responder {
         .body(manifest_file)
 }
 
+#[tracing::instrument(
+    skip(api_data)
+    fields(
+        request_id = %uuid::Uuid::new_v4(),
+    )
+)]
 #[post("/manifest/fetch")]
 async fn fetch_manifest(api_data: web::Data<ApiData>) -> impl Responder {
     match api_data.cmd_sender.send(UserCommand::FetchManifest) {
         Ok(()) => HttpResponse::Ok().finish(),
         Err(e) => {
-            HttpResponse::InternalServerError().body(format!("Unable to handle request: {e}"))
+            let msg = format!("Unable to handle request: {e}");
+            tracing::error!(msg);
+            HttpResponse::InternalServerError().body(msg)
         }
     }
 }
