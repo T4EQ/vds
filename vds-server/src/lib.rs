@@ -40,6 +40,7 @@ pub async fn run_app(listener: TcpListener, config: VdsConfig) -> anyhow::Result
     let server = HttpServer::new(move || {
         App::new()
             .app_data(api_data.clone())
+            .wrap(tracing_actix_web::TracingLogger::default())
             .configure(api::register_handlers)
             .configure(static_files::register_static_files)
     })

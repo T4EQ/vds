@@ -35,6 +35,10 @@ static-files.workspace = true
 thiserror.workspace = true
 tokio-stream.workspace = true
 tokio.workspace = true
+tracing-actix-web.workspace = true
+tracing-bunyan-formatter.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
 uuid.workspace = true
 vds-api.path = "../vds-api"
 

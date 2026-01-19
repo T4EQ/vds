@@ -13,6 +13,7 @@ use tokio_stream::StreamExt;
 
 /// Makes sure that all manifest videos are present in the database with their corresponding state.
 /// Creates entries for missing videos.
+#[tracing::instrument(name = "initialize_video_entries", skip(database, new_manifest))]
 pub async fn initialize_video_entries(
     database: &Database,
     new_manifest: &ManifestFile,
@@ -31,9 +32,15 @@ pub async fn initialize_video_entries(
     Ok(())
 }
 
+#[tracing::instrument(name = "publish_manifest", skip(db, new_manifest), fields(manifest_date = %new_manifest.date))]
+pub async fn publish_manifest(db: &Database, new_manifest: &ManifestFile) {
+    db.publish_manifest(new_manifest).await;
+}
+
 /// Iterates through the on-disk video entries, deleting video content that is not present in the current
 /// manifest. This is a cleanup action that is deferred until the new manifest has been fully
 /// adopted.
+#[tracing::instrument(name = "remove_old_video_content", skip(database, new_manifest))]
 pub async fn remove_old_video_content(
     database: &Database,
     new_manifest: &ManifestFile,
@@ -66,20 +73,22 @@ struct Job {
 /// This task needs to be cancel-safe, because it might get cancelled by calling code if a newer
 /// manifest is found.
 /// For references on cancellation-safety: https://sunshowers.io/posts/cancelling-async-rust/
+#[tracing::instrument(
+    name = "download_manifest_task",
+    skip(ctx, new_manifest),
+    fields(manifest_date = %new_manifest.date)
+)]
 pub async fn download_manifest_task(
     ctx: DownloadContext,
     new_manifest: ManifestFile,
 ) -> anyhow::Result<()> {
-    println!("Creating video entries in the db from manifest");
     initialize_video_entries(&ctx.db, &new_manifest).await?;
 
     // After the video entries for the current manifest have been populated, we are ready to
     // publish the manifest and make it visible to the HTTP clients.
-    println!("Publishing the manifest for availability");
-    ctx.db.publish_manifest(&new_manifest).await;
+    publish_manifest(&ctx.db, &new_manifest).await;
 
     // Mark older content for deletion
-    println!("Deleting old video content");
     remove_old_video_content(&ctx.db, &new_manifest).await?;
 
     // Collect the content that we need to download
@@ -100,6 +109,8 @@ pub async fn download_manifest_task(
         }
     }
 
+    tracing::debug!("Videos pending download: {pending_downloads:?}");
+
     // Because we do not want to ovewhelm the network, we limit the number of concurrent downloads
     // we perform. This limit is configurable via the configuration file.
     let mut inprogress_videos = JoinSet::new();
@@ -116,7 +127,6 @@ pub async fn download_manifest_task(
                 break;
             };
 
-            println!("Starting job for {:?}", current_job.video.id);
             let job = download_job_task(ctx.clone(), current_job.clone());
             inprogress_videos.spawn(job);
         }
@@ -144,7 +154,7 @@ pub async fn download_manifest_task(
 
         tokio::select! {
             job = first_backoff_video => {
-                println!("Video {} will reattempt download", job.video.id);
+                tracing::info!("Video {} will reattempt download", job.video.id);
                 pending_downloads.push_back(job);
             }
 
@@ -152,14 +162,15 @@ pub async fn download_manifest_task(
                 match finished_video? {
                     Ok(()) => { }
                     Err(DownloadJobError::ShouldRetry(mut job)) => {
-                        println!("Video {} failed. Backing off for {:?}", job.video.id, job.backoff_time);
+                        tracing::error!("Video {} failed. Backing off for {:?}", job.video.id, job.backoff_time);
                         let wakeup_time = tokio::time::Instant::now() + job.backoff_time;
                         job.backoff_time = job.backoff_time .mul_f64( ctx.config.retry_params.backoff_factor);
                         backoff_list.push_back((wakeup_time, job));
                     }
                     Err(DownloadJobError::Unrecoverable(job)) => {
-                        println!("Unrecoverable download error for video: {}", job.video.id);
-                        anyhow::bail!("Unrecoverable error for video: {}", job.video.id);
+                        let msg = format!("Unrecoverable download error for video: {}", job.video.id);
+                        tracing::error!(msg);
+                        anyhow::bail!(msg);
                     }
                 }
             }
@@ -176,6 +187,13 @@ enum DownloadJobError {
 }
 
 /// download job task
+#[tracing::instrument(
+    name = "download_job_task",
+    skip(ctx, job),
+    fields(
+        video_id = %job.video.id,
+    )
+)]
 async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), DownloadJobError> {
     let video = &job.video;
     let mut stream = ctx.backend.fetch_resource(&video.uri);
@@ -184,15 +202,16 @@ async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), Downloa
     let mut target_file = tokio::fs::File::create(&target_filepath)
         .await
         .map_err(|e| {
-            println!("Error creating file: {:?}. Error: {}", target_filepath, e);
+            tracing::error!("Error creating file: {:?}. Error: {}", target_filepath, e);
             DownloadJobError::ShouldRetry(job.clone())
         })?;
 
     let translate_error = |e: crate::db::Result<()>| {
         e.map_err(|e| {
-            println!(
+            tracing::error!(
                 "Error setting download status for file: {:?}. Error: {}",
-                target_filepath, e
+                target_filepath,
+                e
             );
             DownloadJobError::Unrecoverable(job.clone())
         })
@@ -209,7 +228,7 @@ async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), Downloa
                     "Error fetching file with id: {}, name: {}. Error: {}",
                     video.id, video.name, err
                 );
-                println!("{error_msg}");
+                tracing::error!("{error_msg}");
 
                 translate_error(ctx.db.set_download_failed(video.id, &error_msg).await)?;
 
@@ -219,10 +238,16 @@ async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), Downloa
 
         hasher.update(&chunk[..]);
         target_file.write_all(&chunk[..]).await.map_err(|e| {
-            println!("Error writing file: {:?}. Error: {}", target_filepath, e);
+            tracing::error!("Error writing file: {:?}. Error: {}", target_filepath, e);
             DownloadJobError::ShouldRetry(job.clone())
         })?;
         total_size += chunk.len();
+
+        tracing::trace!(
+            "Got chunk of {} bytes. Progress: {:.2} %",
+            chunk.len(),
+            (total_size as f64) / (job.video.file_size as f64) * 100.0
+        );
 
         translate_error(
             ctx.db
@@ -238,12 +263,12 @@ async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), Downloa
         let hash: crate::manifest::Sha256 = hash.try_into().expect("Should have 32 bytes");
         let err_msg = &format!("Got hash: {hash}. Expected: {}", video.sha256);
         translate_error(ctx.db.set_download_failed(video.id, err_msg).await)?;
-        println!("{}", err_msg);
+        tracing::error!("{}", err_msg);
         return Err(DownloadJobError::ShouldRetry(job.clone()));
     }
 
     translate_error(ctx.db.set_downloaded(video.id, &target_filepath).await)?;
-
+    tracing::info!("Video downloaded sueccessfully to: {target_filepath:?}");
     Ok(())
 }
 

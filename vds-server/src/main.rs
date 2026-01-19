@@ -1,6 +1,8 @@
-use std::{net::TcpListener, path::PathBuf};
+use std::{io::stdout, net::TcpListener, path::PathBuf};
 
 use clap::Parser;
+use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -42,6 +44,15 @@ fn print_version_info() {
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or(tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with(JsonStorageLayer)
+        .with(BunyanFormattingLayer::new("vds-server".into(), stdout))
+        .init();
+
     let args = Args::parse();
     if args.version {
         print_version_info();

@@ -30,21 +30,20 @@ struct DownloadContext {
     db: Arc<Database>,
 }
 
+#[tracing::instrument(name = "check_manifest_updates", skip(ctx, pending_task))]
 async fn check_updates(
     ctx: DownloadContext,
     pending_task: &mut Option<DownloadJoinHandle>,
 ) -> anyhow::Result<()> {
-    println!("Checking manifest updates");
-
     // Inspect new manifest file
     let Ok(manifest_data) = ctx.backend.fetch_manifest().await.inspect_err(|err| {
-        println!("Error fetching manifest: {err}");
+        tracing::error!("Error fetching manifest: {err}");
     }) else {
         return Ok(());
     };
 
     let Ok(new_manifest) = serde_json::from_slice(&manifest_data).inspect_err(|err| {
-        println!("Received manifest with invalid format from the server: {err}");
+        tracing::error!("Received manifest with invalid format from the server: {err}");
     }) else {
         return Ok(());
     };
@@ -56,7 +55,7 @@ async fn check_updates(
 
     if !is_more_recent_manifest {
         // Nothing to do, the manifest has not changed
-        println!(
+        tracing::info!(
             "Current Manifest dated on {} is up to date",
             cur_manifest.as_ref().unwrap().date
         );
@@ -64,7 +63,7 @@ async fn check_updates(
     }
     drop(cur_manifest);
 
-    println!("Found updated manifest");
+    tracing::info!("Found updated manifest dated on {}", new_manifest.date);
 
     // Note that we do not yet update the actual in-memory manifest, because we need to first make
     // sure that the db contains the corresponding entries
@@ -81,7 +80,7 @@ async fn check_updates(
                 // we cancelled it. It can happen due to race conditions.
                 Ok(task_retval) => task_retval?,
                 Err(e) if e.is_cancelled() => {
-                    println!("Canceled previous download task in favor of a new task");
+                    tracing::info!("Canceled previous download task in favor of a new task");
                 }
                 Err(e) => {
                     return Err(e.into());
@@ -96,6 +95,7 @@ async fn check_updates(
     Ok(())
 }
 
+#[tracing::instrument(name = "run_downloader", skip(config, db))]
 pub async fn run_downloader(
     config: DownloaderConfig,
     db: Arc<Database>,
@@ -109,6 +109,7 @@ pub async fn run_downloader(
         // If we don't have a scheme, we assume it is a file path
         None | Some("file") => {
             let path: PathBuf = config.remote_server.path().into();
+            tracing::info!("Using file backend located at {path:?}");
             Arc::new(FileBackend::new(&path))
         }
         Some("s3") => {
@@ -149,7 +150,7 @@ pub async fn run_downloader(
         };
 
         if let Some(UserCommand::FetchManifest) = cmd {
-            println!("Handling user-requested fetch");
+            tracing::info!("Handling user-requested fetch");
         }
 
         check_updates(download_context.clone(), &mut pending_task).await?;

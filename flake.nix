@@ -146,6 +146,7 @@
               pkgs.cargo-watch
               pkgs.cargo-deny
               pkgs.diesel-cli
+              pkgs.bunyan-rs
             ];
           };
 
