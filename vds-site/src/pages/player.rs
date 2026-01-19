@@ -1,5 +1,7 @@
 use crate::context::ContentContextHandle;
+use gloo_net::http::Request;
 use vds_api::api::content::meta::get::VideoStatus::{Downloaded, Downloading, Failed, Pending};
+use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::prelude::*;
 
@@ -12,6 +14,43 @@ pub struct VideoPlayerProps {
 pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
     let context = use_context::<ContentContextHandle>().expect("ContentContext not found");
     let navigator = use_navigator().expect("Navigator not found");
+
+    {
+        let context = context.clone();
+        let id = id.clone();
+        use_effect_with(id.clone(), move |id| {
+            let id = id.clone();
+            spawn_local(async move {
+                if let Ok(resp) = Request::post(&format!("/api/content/{id}/view"))
+                    .send()
+                    .await
+                {
+                    if resp.ok() {
+                        if let Some(sections) = context.sections.as_ref() {
+                            let mut new_sections = (**sections).clone();
+                            let mut found = false;
+                            for section in &mut new_sections {
+                                for video in &mut section.content {
+                                    if video.id == id {
+                                        video.view_count += 1;
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                                if found {
+                                    break;
+                                }
+                            }
+                            if found {
+                                context.dispatch(new_sections);
+                            }
+                        }
+                    }
+                }
+            });
+            || ()
+        });
+    }
 
     let Some(sections) = &context.sections else {
         return html! {
