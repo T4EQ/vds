@@ -27,8 +27,7 @@ fn print_version_info() {
         println!("\tGit hash: Unknown");
     }
     println!("\tAuthors:");
-    for author in info.authors.split(':') {
-        let author = author.trim();
+    for author in info.authors {
         println!("\t\t{author}");
     }
     println!("\tHomepage: {}", info.homepage);

@@ -4,7 +4,7 @@ pub struct BuildInfo {
     pub name: &'static str,
     pub version: &'static str,
     pub git_hash: Option<String>,
-    pub authors: &'static str,
+    pub authors: Vec<String>,
     pub homepage: &'static str,
     pub license: &'static str,
     pub repository: &'static str,
@@ -33,11 +33,15 @@ fn git_hash() -> Option<String> {
 }
 
 pub fn get() -> BuildInfo {
+    let authors = PKG_AUTHORS
+        .split(':')
+        .map(|author| author.trim().to_string())
+        .collect();
     BuildInfo {
         name: PKG_NAME,
         version: PKG_VERSION,
         git_hash: git_hash(),
-        authors: PKG_AUTHORS,
+        authors,
         homepage: PKG_HOMEPAGE,
         license: PKG_LICENSE,
         repository: PKG_REPOSITORY,
