@@ -14,6 +14,10 @@ pub struct VideoPlayerProps {
 pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
     let context = use_context::<ContentContextHandle>().expect("ContentContext not found");
     let navigator = use_navigator().expect("Navigator not found");
+    let on_back_click_navigator = navigator.clone();
+    let on_back_click = Callback::from(move |_| {
+        on_back_click_navigator.back();
+    });
 
     {
         let context = context.clone();
@@ -77,6 +81,12 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
         <div class="page player-page">
             <div class="player-main">
                 <header>
+                    <button class="back-button" onclick={on_back_click}>
+                        <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF">
+                            <path d="M0 0h24v24H0z" fill="none"/>
+                            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                        </svg>
+                    </button>
                     <h1>{ &section.name }</h1>
                 </header>
 
@@ -124,10 +134,10 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
                     };
 
                     let onclick = if is_downloaded {
-                        let navigator = navigator.clone();
+                        let list_item_navigator = navigator.clone();
                         let video_id = video.id.clone();
                         Callback::from(move |_| {
-                            navigator.replace(&crate::app::Route::Player { id: video_id.clone() });
+                            list_item_navigator.replace(&crate::app::Route::Player { id: video_id.clone() });
                         })
                     } else {
                         Callback::noop()

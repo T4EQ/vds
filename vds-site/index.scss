@@ -176,6 +176,13 @@ h2 {
 .player-page {
   gap: 1rem;
 
+  .back-button {
+    background: none;
+    border: none;
+    float: left;
+    margin-right: 0.5rem;
+  }
+
   .player-main {
     display: flex;
     flex-direction: column;
