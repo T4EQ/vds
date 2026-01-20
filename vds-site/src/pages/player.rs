@@ -14,37 +14,46 @@ pub struct VideoPlayerProps {
 pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
     let context = use_context::<ContentContextHandle>().expect("ContentContext not found");
     let navigator = use_navigator().expect("Navigator not found");
-    let on_back_click = {
-        let navigator = navigator.clone();
-        Callback::from(move |_| {
-            navigator.back();
-        })
-    };
 
     {
         let context = context.clone();
-        use_effect_with(id.clone(), move |id| {
-            let id = id.clone();
-            spawn_local(async move {
-                if let Ok(resp) = Request::post(&format!("/api/content/{id}/view"))
-                    .send()
-                    .await
-                {
-                    if resp.ok()
-                        && let Some(sections) = context.sections.as_ref()
-                    {
-                        let mut new_sections = (**sections).clone();
-                        if let Some(vid) = new_sections
-                            .iter_mut()
-                            .flat_map(|s| s.content.iter_mut())
-                            .find(|v| v.id == id)
+        let id = id.clone();
+        let sections_loaded = context.sections.is_some();
+
+        use_effect_with((id, sections_loaded), move |(video_id, sections_loaded)| {
+            if *sections_loaded {
+                let video_downloaded = context
+                    .sections
+                    .iter()
+                    .flat_map(|sections| sections.iter())
+                    .flat_map(|s| s.content.iter())
+                    .any(|v| v.id == *video_id && v.status == Downloaded);
+
+                if video_downloaded {
+                    let id = video_id.clone();
+                    let context = context.clone();
+                    spawn_local(async move {
+                        if let Ok(resp) = Request::post(&format!("/api/content/{id}/view"))
+                            .send()
+                            .await
                         {
-                            vid.view_count += 1;
-                            context.dispatch(new_sections);
+                            if resp.ok() {
+                                if let Some(sections) = context.sections.as_ref() {
+                                    let mut new_sections = (**sections).clone();
+                                    if let Some(vid) = new_sections
+                                        .iter_mut()
+                                        .flat_map(|s| s.content.iter_mut())
+                                        .find(|v| v.id == id)
+                                    {
+                                        vid.view_count += 1;
+                                        context.dispatch(new_sections);
+                                    }
+                                }
+                            }
                         }
-                    }
+                    });
                 }
-            });
+            }
             || ()
         });
     }
@@ -57,15 +66,24 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
         };
     };
 
-    let Some((section, active_video)) = sections
-        .iter()
-        .find_map(|s| s.content.iter().find(|v| v.id == *id).map(|v| (s, v)))
-    else {
+    let Some((section, active_video)) = sections.iter().find_map(|s| {
+        s.content
+            .iter()
+            .find(|v| v.id == *id)
+            .map(|v| (s, (v.status == Downloaded).then_some(v.clone())))
+    }) else {
         return html! {
             <div class={"page"}>
                 <p>{"Invalid video ID."}</p>
            </div>
         };
+    };
+
+    let on_back_click = {
+        let navigator = navigator.clone();
+        Callback::from(move |_| {
+            navigator.back();
+        })
     };
 
     let active_icon = html! {
@@ -85,8 +103,6 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
         </svg>
     };
 
-    let video_path = format!("/api/content/{}", active_video.id);
-
     html! {
         <div class="page player-page">
             <div class="player-main">
@@ -100,21 +116,33 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
                     <h1>{ &section.name }</h1>
                 </header>
 
-                <video key={active_video.id.clone()} controls=true autoplay=true class="video-player">
-                    <source src={video_path} type="video/mp4" />
-                </video>
+                {
+                    if let Some(active_video) = &active_video {
+                        let video_path = format!("/api/content/{}", active_video.id);
 
-                <h2>{ &active_video.name }</h2>
+                        html! {
+                            <div>
+                                <video key={active_video.id.clone()} controls=true autoplay=true class="video-player">
+                                    <source src={video_path} type="video/mp4" />
+                                </video>
 
-                <div class={"details"}>
-                    <span>{ format!("{} views", active_video.view_count) }</span>
-                </div>
+                                <h2>{ &active_video.name }</h2>
+
+                                <div class={"details"}>
+                                    <span>{ format!("{} views", active_video.view_count) }</span>
+                                </div>
+                            </div>
+                        }
+                    } else {
+                        html! {}
+                    }
+                }
             </div>
 
             <div class={"video-list list"}>
             {
                 section.content.iter().enumerate().map(|(i, video)| {
-                    let is_active = video.id == active_video.id;
+                    let is_active = active_video.as_ref().is_some_and(|v| v.id == video.id);
                     let icon = if is_active {
                         active_icon.clone()
                     } else {

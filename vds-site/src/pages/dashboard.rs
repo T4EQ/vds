@@ -68,15 +68,15 @@ pub fn playlists_list() -> Html {
         }
     } else {
         html! {
-                <div class="playlist-list list">
-                {
-                    sections.iter().map(|section| {
-                        let num_videos = section.content.len();
-                        let first_video_id = section.content.first().map(|v| v.id.clone());
-                        html! { <PlaylistCard playlist_name={section.name.clone()} num_videos={num_videos} first_video_id={first_video_id} /> }
-                    }).collect::<Html>()
-                }
-                </div>
+            <div class="playlist-list list">
+            {
+                sections.iter().map(|section| {
+                    let num_videos = section.content.len();
+                    let first_video_id = section.content.first().map(|v| v.id.clone());
+                    html! { <PlaylistCard playlist_name={section.name.clone()} num_videos={num_videos} first_video_id={first_video_id} /> }
+                }).collect::<Html>()
+            }
+            </div>
         }
     }
 }
