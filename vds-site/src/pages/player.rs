@@ -14,14 +14,15 @@ pub struct VideoPlayerProps {
 pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
     let context = use_context::<ContentContextHandle>().expect("ContentContext not found");
     let navigator = use_navigator().expect("Navigator not found");
-    let on_back_click_navigator = navigator.clone();
-    let on_back_click = Callback::from(move |_| {
-        on_back_click_navigator.back();
-    });
+    let on_back_click = {
+        let navigator = navigator.clone();
+        Callback::from(move |_| {
+            navigator.back();
+        })
+    };
 
     {
         let context = context.clone();
-        let id = id.clone();
         use_effect_with(id.clone(), move |id| {
             let id = id.clone();
             spawn_local(async move {
@@ -29,25 +30,17 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
                     .send()
                     .await
                 {
-                    if resp.ok() {
-                        if let Some(sections) = context.sections.as_ref() {
-                            let mut new_sections = (**sections).clone();
-                            let mut found = false;
-                            for section in &mut new_sections {
-                                for video in &mut section.content {
-                                    if video.id == id {
-                                        video.view_count += 1;
-                                        found = true;
-                                        break;
-                                    }
-                                }
-                                if found {
-                                    break;
-                                }
-                            }
-                            if found {
-                                context.dispatch(new_sections);
-                            }
+                    if resp.ok()
+                        && let Some(sections) = context.sections.as_ref()
+                    {
+                        let mut new_sections = (**sections).clone();
+                        if let Some(vid) = new_sections
+                            .iter_mut()
+                            .flat_map(|s| s.content.iter_mut())
+                            .find(|v| v.id == id)
+                        {
+                            vid.view_count += 1;
+                            context.dispatch(new_sections);
                         }
                     }
                 }
@@ -73,6 +66,23 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
                 <p>{"Invalid video ID."}</p>
            </div>
         };
+    };
+
+    let active_icon = html! {
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <rect x="5" y="10" width="2" height="4" rx="1">
+                <animate attributeName="height" values="4;16;4" begin="0s" dur="1.2s" repeatCount="indefinite" />
+                <animate attributeName="y" values="10;4;10" begin="0s" dur="1.2s" repeatCount="indefinite" />
+            </rect>
+            <rect x="11" y="10" width="2" height="4" rx="1">
+                <animate attributeName="height" values="4;16;4" begin="0.2s" dur="1.2s" repeatCount="indefinite" />
+                <animate attributeName="y" values="10;4;10" begin="0.2s" dur="1.2s" repeatCount="indefinite" />
+            </rect>
+            <rect x="17" y="10" width="2" height="4" rx="1">
+                <animate attributeName="height" values="4;16;4" begin="0.4s" dur="1.2s" repeatCount="indefinite" />
+                <animate attributeName="y" values="10;4;10" begin="0.4s" dur="1.2s" repeatCount="indefinite" />
+            </rect>
+        </svg>
     };
 
     let video_path = format!("/api/content/{}", active_video.id);
@@ -106,22 +116,7 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
                 section.content.iter().enumerate().map(|(i, video)| {
                     let is_active = video.id == active_video.id;
                     let icon = if is_active {
-                        html! {
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                <rect x="5" y="10" width="2" height="4" rx="1">
-                                    <animate attributeName="height" values="4;16;4" begin="0s" dur="1.2s" repeatCount="indefinite" />
-                                    <animate attributeName="y" values="10;4;10" begin="0s" dur="1.2s" repeatCount="indefinite" />
-                                </rect>
-                                <rect x="11" y="10" width="2" height="4" rx="1">
-                                    <animate attributeName="height" values="4;16;4" begin="0.2s" dur="1.2s" repeatCount="indefinite" />
-                                    <animate attributeName="y" values="10;4;10" begin="0.2s" dur="1.2s" repeatCount="indefinite" />
-                                </rect>
-                                <rect x="17" y="10" width="2" height="4" rx="1">
-                                    <animate attributeName="height" values="4;16;4" begin="0.4s" dur="1.2s" repeatCount="indefinite" />
-                                    <animate attributeName="y" values="10;4;10" begin="0.4s" dur="1.2s" repeatCount="indefinite" />
-                                </rect>
-                            </svg>
-                        }
+                        active_icon.clone()
                     } else {
                         html! { <span>{ format!("{:02}", i + 1) }</span> }
                     };

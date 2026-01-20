@@ -1,3 +1,4 @@
+use std::hash::{DefaultHasher, Hasher};
 use yew::prelude::*;
 use yew_router::prelude::*;
 
@@ -19,28 +20,24 @@ pub fn playlist_card(
     }: &PlaylistCardProps,
 ) -> Html {
     let navigator = use_navigator();
-    let first_video_id = first_video_id.clone();
 
     let onclick = if *num_videos > 0 {
+        let first_video_id = first_video_id.clone();
         Callback::from(move |_| {
-            if let Some(navigator) = &navigator {
-                if let Some(id) = &first_video_id {
-                    navigator.push(&crate::app::Route::Player { id: id.clone() });
-                }
+            if let Some(navigator) = &navigator
+                && let Some(id) = &first_video_id
+            {
+                navigator.push(&crate::app::Route::Player { id: id.clone() });
             }
         })
     } else {
         Callback::noop()
     };
 
-    let first_letter = playlist_name
-        .chars()
-        .next()
-        .map(|c| c.to_string())
-        .unwrap_or_default();
-    let hue = playlist_name.chars().fold(5381u32, |acc, c| {
-        acc.wrapping_shl(5).wrapping_add(acc).wrapping_add(c as u32)
-    }) % 360;
+    let first_letter = playlist_name.chars().next().unwrap_or_default();
+    let mut hasher = DefaultHasher::new();
+    hasher.write(playlist_name.as_bytes());
+    let hue = hasher.finish() % 360;
     let icon_style = format!("color: hsl({}, 70%, 60%);", hue);
 
     html! {
