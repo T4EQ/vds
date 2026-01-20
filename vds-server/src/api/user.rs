@@ -113,7 +113,7 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
         loop {
             // Note we are using a new bytes instance each time on purpose. We could have used
             // `split()` to get the current bytes out and reuse the instance. However, that makes
-            // the bytes turne into a shared instance, which only releases the bytes once all
+            // the bytes turn into a shared instance, which only releases the bytes once all
             // references to each of the chunks are dropped.
             //
             // This would not meet the intent of this code, which is to reduce the memory footprint
