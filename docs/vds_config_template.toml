@@ -1,4 +1,4 @@
-debug = true
+debug = false
 
 [db_config]
 runtime_path = "/tmp/vds/runtime_path"
