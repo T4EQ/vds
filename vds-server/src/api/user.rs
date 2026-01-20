@@ -86,11 +86,10 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
     let Ok(id) = id.into_inner().try_into() else {
         return HttpResponse::BadRequest().body("Invalid video ID");
     };
-
     let Ok(crate::db::Video {
         download_status: crate::db::DownloadStatus::Downloaded(filepath),
         ..
-    }) = api_data.db.increment_view_count(id).await
+    }) = api_data.db.find_video(id).await
     else {
         return HttpResponse::NotFound().body("Requested video ID is not available");
     };
@@ -112,6 +111,21 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
     };
 
     HttpResponse::Ok().content_type("video/mp4").body(data)
+}
+
+#[post("/content/{id}/view")]
+async fn increment_view_cnt(api_data: web::Data<ApiData>, id: web::Path<String>) -> impl Responder {
+    let Ok(id) = id.into_inner().try_into() else {
+        return HttpResponse::BadRequest().body("Invalid video ID");
+    };
+    let Ok(crate::db::Video {
+        download_status: crate::db::DownloadStatus::Downloaded(_),
+        ..
+    }) = api_data.db.increment_view_count(id).await
+    else {
+        return HttpResponse::NotFound().body("Requested video ID is not available");
+    };
+    HttpResponse::Ok().finish()
 }
 
 #[get("/manifest/latest")]

@@ -1,28 +1,9 @@
+use crate::context::ContentContextHandle;
 use gloo_net::http::Request;
+use vds_api::api::content::meta::get::VideoStatus::{Downloaded, Downloading, Failed, Pending};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
-
-use vds_api::api::content::meta::id::get::{LocalVideoMeta, Response};
-
-async fn fetch_video_content(id: &str) -> Option<LocalVideoMeta> {
-    let response = Request::get(&format!("/api/content/meta/{id}"))
-        .send()
-        .await
-        .inspect_err(|e| {
-            log::error!("Failed to fetch videos. Error performing HTTP request: {e:?}");
-        })
-        .ok()?;
-
-    let response = response
-        .json::<Response>()
-        .await
-        .inspect_err(|e| {
-            log::error!("Failed to fetch videos. Error decoding json: {e:?}");
-        })
-        .ok()?;
-
-    response.meta
-}
+use yew_router::prelude::*;
 
 #[derive(yew::Properties, PartialEq, Eq)]
 pub struct VideoPlayerProps {
@@ -31,34 +12,144 @@ pub struct VideoPlayerProps {
 
 #[function_component(VideoPlayer)]
 pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
-    let video: UseStateHandle<Option<LocalVideoMeta>> = use_state(|| None);
+    let context = use_context::<ContentContextHandle>().expect("ContentContext not found");
+    let navigator = use_navigator().expect("Navigator not found");
+    let on_back_click = {
+        let navigator = navigator.clone();
+        Callback::from(move |_| {
+            navigator.back();
+        })
+    };
 
-    use_effect_with((id.to_string(), video.clone()), move |(id, vid)| {
-        if vid.is_none() {
-            let vid = vid.clone();
+    {
+        let context = context.clone();
+        use_effect_with(id.clone(), move |id| {
             let id = id.clone();
             spawn_local(async move {
-                vid.set(fetch_video_content(&id).await);
+                if let Ok(resp) = Request::post(&format!("/api/content/{id}/view"))
+                    .send()
+                    .await
+                {
+                    if resp.ok()
+                        && let Some(sections) = context.sections.as_ref()
+                    {
+                        let mut new_sections = (**sections).clone();
+                        if let Some(vid) = new_sections
+                            .iter_mut()
+                            .flat_map(|s| s.content.iter_mut())
+                            .find(|v| v.id == id)
+                        {
+                            vid.view_count += 1;
+                            context.dispatch(new_sections);
+                        }
+                    }
+                }
             });
-        }
-        || ()
-    });
+            || ()
+        });
+    }
 
-    let name = video
-        .as_ref()
-        .map(|v| &v.name as &str)
-        .unwrap_or("Loading...");
+    let Some(sections) = &context.sections else {
+        return html! {
+            <div class={"page"}>
+                <p>{"Loading..."}</p>
+            </div>
+        };
+    };
 
-    let path = format!("/api/content/{id}");
+    let Some((section, active_video)) = sections
+        .iter()
+        .find_map(|s| s.content.iter().find(|v| v.id == *id).map(|v| (s, v)))
+    else {
+        return html! {
+            <div class={"page"}>
+                <p>{"Invalid video ID."}</p>
+           </div>
+        };
+    };
+
+    let active_icon = html! {
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <rect x="5" y="10" width="2" height="4" rx="1">
+                <animate attributeName="height" values="4;16;4" begin="0s" dur="1.2s" repeatCount="indefinite" />
+                <animate attributeName="y" values="10;4;10" begin="0s" dur="1.2s" repeatCount="indefinite" />
+            </rect>
+            <rect x="11" y="10" width="2" height="4" rx="1">
+                <animate attributeName="height" values="4;16;4" begin="0.2s" dur="1.2s" repeatCount="indefinite" />
+                <animate attributeName="y" values="10;4;10" begin="0.2s" dur="1.2s" repeatCount="indefinite" />
+            </rect>
+            <rect x="17" y="10" width="2" height="4" rx="1">
+                <animate attributeName="height" values="4;16;4" begin="0.4s" dur="1.2s" repeatCount="indefinite" />
+                <animate attributeName="y" values="10;4;10" begin="0.4s" dur="1.2s" repeatCount="indefinite" />
+            </rect>
+        </svg>
+    };
+
+    let video_path = format!("/api/content/{}", active_video.id);
+
     html! {
-        <div class="dashboard">
-            <header class="dashboard-header">
-                <h1>{name}</h1>
-            </header>
+        <div class="page player-page">
+            <div class="player-main">
+                <header>
+                    <button class="back-button" onclick={on_back_click}>
+                        <svg xmlns="http://www.w3.org/2000/svg" height="30px" viewBox="0 0 24 24" width="24px" fill="#FFFFFF">
+                            <path d="M0 0h24v24H0z" fill="none"/>
+                            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                        </svg>
+                    </button>
+                    <h1>{ &section.name }</h1>
+                </header>
 
-            <video controls=true autoplay=true class="video-player">
-                <source src={path} type="video/mp4" />
-            </video>
+                <video key={active_video.id.clone()} controls=true autoplay=true class="video-player">
+                    <source src={video_path} type="video/mp4" />
+                </video>
+
+                <h2>{ &active_video.name }</h2>
+
+                <div class={"details"}>
+                    <span>{ format!("{} views", active_video.view_count) }</span>
+                </div>
+            </div>
+
+            <div class={"video-list list"}>
+            {
+                section.content.iter().enumerate().map(|(i, video)| {
+                    let is_active = video.id == active_video.id;
+                    let icon = if is_active {
+                        active_icon.clone()
+                    } else {
+                        html! { <span>{ format!("{:02}", i + 1) }</span> }
+                    };
+
+                    let (is_downloaded, status_text) = match &video.status {
+                        Downloaded => (true, format!("{} views", video.view_count)),
+                        Downloading(progress) => (false, format!("Downloading ({:.0}%)", progress.0 * 100.0)),
+                        Pending => (false, "Pending".to_string()),
+                        Failed(_) => (false, "Download failed".to_string()),
+                    };
+
+                    let onclick = if is_downloaded {
+                        let list_item_navigator = navigator.clone();
+                        let video_id = video.id.clone();
+                        Callback::from(move |_| {
+                            list_item_navigator.replace(&crate::app::Route::Player { id: video_id.clone() });
+                        })
+                    } else {
+                        Callback::noop()
+                    };
+
+                    html! {
+                        <div {onclick} class={classes!("card", is_active.then_some("active"), (!is_downloaded).then_some("unavailable"))}>
+                            <div class="icon">{ icon }</div>
+                            <div class="details">
+                                <h3>{ &video.name }</h3>
+                                <span>{ status_text }</span>
+                            </div>
+                        </div>
+                    }
+                }).collect::<Html>()
+            }
+            </div>
         </div>
     }
 }
