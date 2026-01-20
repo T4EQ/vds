@@ -44,21 +44,23 @@ fn print_version_info() {
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or(tracing_subscriber::EnvFilter::new("info")),
-        )
-        .with(JsonStorageLayer)
-        .with(BunyanFormattingLayer::new("vds-server".into(), stdout))
-        .init();
-
     let args = Args::parse();
     if args.version {
         print_version_info();
         return Ok(());
     }
     let config = vds_server::cfg::get_config(&args.config.unwrap_or_else(default_config_path))?;
+
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                let level = if config.debug { "trace" } else { "info" };
+                tracing_subscriber::EnvFilter::new(level)
+            }),
+        )
+        .with(JsonStorageLayer)
+        .with(BunyanFormattingLayer::new("vds-server".into(), stdout))
+        .init();
 
     let listener = TcpListener::bind(format!(
         "{}:{}",
