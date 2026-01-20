@@ -1,4 +1,7 @@
-use actix_web::{HttpResponse, Responder, get, post, web};
+use actix_web::{
+    HttpResponse, Responder, get, post,
+    web::{self, Bytes, BytesMut},
+};
 use tokio::io::AsyncReadExt;
 
 use vds_api::api::content::meta::get::{GroupedSection, LocalVideoMeta, Progress, VideoStatus};
@@ -97,7 +100,7 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
     let mut file = match tokio::fs::File::open(filepath).await {
         Ok(file) => file,
         Err(e) if e.kind() == tokio::io::ErrorKind::NotFound => {
-            return HttpResponse::NotFound().finish();
+            return HttpResponse::InternalServerError().body("Requested video is not on disk");
         }
         Err(e) => {
             return HttpResponse::InternalServerError()
@@ -105,12 +108,33 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
         }
     };
 
-    let mut data = Vec::new();
-    if let Err(e) = file.read_to_end(&mut data).await {
-        return HttpResponse::InternalServerError().body(format!("Unable to read file: {e:?}"));
+    const RESPONSE_CHUNK_SIZE: usize = 4096;
+    let s = async_stream::stream! {
+        loop {
+            // Note we are using a new bytes instance each time on purpose. We could have used
+            // `split()` to get the current bytes out and reuse the instance. However, that makes
+            // the bytes turne into a shared instance, which only releases the bytes once all
+            // references to each of the chunks are dropped.
+            //
+            // This would not meet the intent of this code, which is to reduce the memory footprint
+            // of this HTTP method, as some files might be hundreds of megabytes or even gigabytes
+            // in size, and we only have 1 GiB of RAM for the entire platform.
+            let mut bytes = BytesMut::with_capacity(RESPONSE_CHUNK_SIZE);
+            let Ok(n) = file.read_buf(&mut bytes).await else {
+                yield Err::<Bytes, anyhow::Error>(anyhow::anyhow!("Unable to read data from file"));
+                return;
+            };
+            if n == 0 {
+                return;
+            }
+
+            yield Ok::<Bytes, anyhow::Error>(bytes.freeze());
+        }
     };
 
-    HttpResponse::Ok().content_type("video/mp4").body(data)
+    HttpResponse::Ok()
+        .content_type("video/mp4")
+        .streaming(Box::pin(s))
 }
 
 #[post("/content/{id}/view")]
