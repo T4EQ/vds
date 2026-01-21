@@ -17,7 +17,7 @@ mod static_files;
 
 pub async fn run_app(listener: TcpListener, config: VdsConfig) -> anyhow::Result<()> {
     let database = Arc::new(
-        db::Database::open(config.db_config)
+        db::Database::open(config.db_config.clone())
             .await
             .context("While initializing database")?,
     );
@@ -27,12 +27,13 @@ pub async fn run_app(listener: TcpListener, config: VdsConfig) -> anyhow::Result
     let (user_command_sender, user_command_receiver) = mpsc::unbounded_channel();
 
     let downloader = downloader::run_downloader(
-        config.downloader_config,
+        config.downloader_config.clone(),
         Arc::clone(&database),
         user_command_receiver,
     );
 
     let api_data = web::Data::new(api::ApiData::new(
+        config.clone(),
         Arc::clone(&database),
         user_command_sender,
     ));

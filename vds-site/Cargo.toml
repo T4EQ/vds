@@ -9,6 +9,8 @@ homepage = "https://github.com/t4eq/vds"
 repository = "https://github.com/t4eq/vds"
 
 [dependencies]
+anyhow.workspace = true
+base64.workspace = true
 gloo-net.workspace = true
 log.workspace = true
 serde.workspace = true
