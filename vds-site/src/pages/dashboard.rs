@@ -22,11 +22,11 @@ pub fn playlist_card(
     let navigator = use_navigator();
 
     let onclick = if *num_videos > 0 {
-        let playlist_id = playlist_id.clone();
+        let playlist_id = *playlist_id;
         Callback::from(move |_| {
             if let Some(navigator) = &navigator {
                 navigator.push(&crate::app::Route::Playlist {
-                    playlist_id: playlist_id.clone(),
+                    playlist_id: playlist_id,
                 });
             }
         })
