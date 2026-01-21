@@ -7,46 +7,67 @@ use yew_router::prelude::*;
 
 #[derive(yew::Properties, PartialEq, Eq)]
 pub struct VideoPlayerProps {
-    pub id: String,
+    pub playlist_id: usize,
+    pub video_id: Option<String>,
 }
 
 #[function_component(VideoPlayer)]
-pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
+pub fn video_player(
+    VideoPlayerProps {
+        playlist_id,
+        video_id,
+    }: &VideoPlayerProps,
+) -> Html {
     let context = use_context::<ContentContextHandle>().expect("ContentContext not found");
     let navigator = use_navigator().expect("Navigator not found");
-    let on_back_click = {
-        let navigator = navigator.clone();
-        Callback::from(move |_| {
-            navigator.back();
-        })
-    };
 
     {
         let context = context.clone();
-        use_effect_with(id.clone(), move |id| {
-            let id = id.clone();
-            spawn_local(async move {
-                if let Ok(resp) = Request::post(&format!("/api/content/{id}/view"))
-                    .send()
-                    .await
+        let sections_loaded = context.sections.is_some();
+        use_effect_with(
+            (*playlist_id, video_id.clone(), sections_loaded),
+            move |(playlist_id, video_id, _)| {
+                if let Some(sections) = &context.sections
+                    && let Some(video_id) = video_id.as_ref()
+                    && sections.get(*playlist_id).is_some_and(|s| {
+                        s.content
+                            .iter()
+                            .any(|v| v.id == *video_id && v.status == Downloaded)
+                    })
                 {
-                    if resp.ok()
-                        && let Some(sections) = context.sections.as_ref()
-                    {
+                    let playlist_id = *playlist_id;
+                    let video_id = video_id.clone();
+                    let context = context.clone();
+
+                    spawn_local(async move {
+                        let Ok(resp) = Request::post(&format!("/api/content/{video_id}/view"))
+                            .send()
+                            .await
+                        else {
+                            return;
+                        };
+
+                        if !resp.ok() {
+                            return;
+                        }
+
+                        let Some(sections) = context.sections.as_ref() else {
+                            return;
+                        };
+
                         let mut new_sections = (**sections).clone();
-                        if let Some(vid) = new_sections
-                            .iter_mut()
-                            .flat_map(|s| s.content.iter_mut())
-                            .find(|v| v.id == id)
+                        if let Some(video) = new_sections
+                            .get_mut(playlist_id)
+                            .and_then(|s| s.content.iter_mut().find(|v| v.id == video_id))
                         {
-                            vid.view_count += 1;
+                            video.view_count += 1;
                             context.dispatch(new_sections);
                         }
-                    }
+                    });
                 }
-            });
-            || ()
-        });
+                || ()
+            },
+        );
     }
 
     let Some(sections) = &context.sections else {
@@ -57,15 +78,31 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
         };
     };
 
-    let Some((section, active_video)) = sections
-        .iter()
-        .find_map(|s| s.content.iter().find(|v| v.id == *id).map(|v| (s, v)))
-    else {
+    let Some(section) = sections.get(*playlist_id) else {
         return html! {
             <div class={"page"}>
-                <p>{"Invalid video ID."}</p>
-           </div>
+                <p>{"Invalid playlist."}</p>
+            </div>
         };
+    };
+
+    let active_video = video_id
+        .as_ref()
+        .and_then(|video_id| section.content.iter().find(|v| v.id == *video_id));
+
+    if video_id.is_some() && active_video.is_none() {
+        return html! {
+            <div class={"page"}>
+                <p>{"Video not found in this playlist."}</p>
+            </div>
+        };
+    }
+
+    let on_back_click = {
+        let navigator = navigator.clone();
+        Callback::from(move |_| {
+            navigator.back();
+        })
     };
 
     let active_icon = html! {
@@ -85,8 +122,6 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
         </svg>
     };
 
-    let video_path = format!("/api/content/{}", active_video.id);
-
     html! {
         <div class="page player-page">
             <div class="player-main">
@@ -100,54 +135,73 @@ pub fn video_player(VideoPlayerProps { id }: &VideoPlayerProps) -> Html {
                     <h1>{ &section.name }</h1>
                 </header>
 
-                <video key={active_video.id.clone()} controls=true autoplay=true class="video-player">
-                    <source src={video_path} type="video/mp4" />
-                </video>
+                {
+                    if let Some(active_video) = active_video && active_video.status == Downloaded {
+                        let video_path = format!("/api/content/{}", active_video.id);
+                        html!{
+                            <div>
+                                <video key={active_video.id.clone()} controls=true autoplay=true class="video-player">
+                                    <source src={video_path} type="video/mp4" />
+                                </video>
 
-                <h2>{ &active_video.name }</h2>
+                                <h2>{ &active_video.name }</h2>
 
-                <div class={"details"}>
-                    <span>{ format!("{} views", active_video.view_count) }</span>
-                </div>
+                                <div class={"details"}>
+                                    <span>{ format!("{} views", active_video.view_count) }</span>
+                                </div>
+                            </div>
+                        }
+                    } else {
+                        html!{}
+                    }
+                }
             </div>
 
             <div class={"video-list list"}>
             {
-                section.content.iter().enumerate().map(|(i, video)| {
-                    let is_active = video.id == active_video.id;
-                    let icon = if is_active {
-                        active_icon.clone()
-                    } else {
-                        html! { <span>{ format!("{:02}", i + 1) }</span> }
-                    };
-
-                    let (is_downloaded, status_text) = match &video.status {
-                        Downloaded => (true, format!("{} views", video.view_count)),
-                        Downloading(progress) => (false, format!("Downloading ({:.0}%)", progress.0 * 100.0)),
-                        Pending => (false, "Pending".to_string()),
-                        Failed(_) => (false, "Download failed".to_string()),
-                    };
-
-                    let onclick = if is_downloaded {
-                        let list_item_navigator = navigator.clone();
-                        let video_id = video.id.clone();
-                        Callback::from(move |_| {
-                            list_item_navigator.replace(&crate::app::Route::Player { id: video_id.clone() });
-                        })
-                    } else {
-                        Callback::noop()
-                    };
-
+                if section.content.is_empty() {
                     html! {
-                        <div {onclick} class={classes!("card", is_active.then_some("active"), (!is_downloaded).then_some("unavailable"))}>
-                            <div class="icon">{ icon }</div>
-                            <div class="details">
-                                <h3>{ &video.name }</h3>
-                                <span>{ status_text }</span>
-                            </div>
-                        </div>
+                        <p>{"No videos in this playlist."}</p>
                     }
-                }).collect::<Html>()
+                } else {
+                    section.content.iter().enumerate().map(|(i, video)| {
+                        let (is_downloaded, status_text) = match &video.status {
+                            Downloaded => (true, format!("{} views", video.view_count)),
+                            Downloading(progress) => (false, format!("Downloading ({:.0}%)", progress.0 * 100.0)),
+                            Pending => (false, "Pending".to_string()),
+                            Failed(_) => (false, "Download failed".to_string()),
+                        };
+
+                        let is_active = active_video.is_some_and(|active| active.id == video.id) && is_downloaded;
+                        let icon = if is_active {
+                            active_icon.clone()
+                        } else {
+                            html! { <span>{ format!("{:02}", i + 1) }</span> }
+                        };
+
+
+                        let onclick = if is_downloaded {
+                            let navigator = navigator.clone();
+                            let playlist_id = *playlist_id;
+                            let video_id = video.id.clone();
+                            Callback::from(move |_| {
+                                navigator.replace(&crate::app::Route::Video { playlist_id: playlist_id, video_id: video_id.clone() });
+                            })
+                        } else {
+                            Callback::noop()
+                        };
+
+                        html! {
+                            <div {onclick} class={classes!("card", is_active.then_some("active"), (!is_downloaded).then_some("unavailable"))}>
+                                <div class="icon">{ icon }</div>
+                                <div class="details">
+                                    <h3>{ &video.name }</h3>
+                                    <span>{ status_text }</span>
+                                </div>
+                            </div>
+                        }
+                    }).collect::<Html>()
+                }
             }
             </div>
         </div>

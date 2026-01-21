@@ -9,8 +9,15 @@ use crate::pages::player::VideoPlayer;
 pub enum Route {
     #[at("/")]
     Home,
-    #[at("/player/:id")]
-    Player { id: String },
+
+    #[at("/playlists/:playlist_id")]
+    Playlist { playlist_id: usize },
+
+    #[at("/playlists/:playlist_id/videos/:video_id")]
+    Video {
+        playlist_id: usize,
+        video_id: String,
+    },
 }
 
 fn switch(route: Route) -> Html {
@@ -21,9 +28,18 @@ fn switch(route: Route) -> Html {
                 </Dashboard>
             }
         }
-        Route::Player { id } => {
+        Route::Playlist { playlist_id } => {
             html! {
-                <VideoPlayer id={id}>
+                <VideoPlayer playlist_id={playlist_id} video_id={None as Option<String>}>
+                </VideoPlayer>
+            }
+        }
+        Route::Video {
+            playlist_id,
+            video_id,
+        } => {
+            html! {
+                <VideoPlayer playlist_id={playlist_id} video_id={Some(video_id)}>
                 </VideoPlayer>
             }
         }
