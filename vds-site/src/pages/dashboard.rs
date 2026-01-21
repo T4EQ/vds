@@ -6,28 +6,28 @@ use crate::context::ContentContextHandle;
 
 #[derive(yew::Properties, PartialEq)]
 pub struct PlaylistCardProps {
+    pub playlist_id: usize,
     pub playlist_name: String,
     pub num_videos: usize,
-    pub first_video_id: Option<String>,
 }
 
 #[function_component(PlaylistCard)]
 pub fn playlist_card(
     PlaylistCardProps {
+        playlist_id,
         playlist_name,
         num_videos,
-        first_video_id,
     }: &PlaylistCardProps,
 ) -> Html {
     let navigator = use_navigator();
 
     let onclick = if *num_videos > 0 {
-        let first_video_id = first_video_id.clone();
+        let playlist_id = playlist_id.clone();
         Callback::from(move |_| {
-            if let Some(navigator) = &navigator
-                && let Some(id) = &first_video_id
-            {
-                navigator.push(&crate::app::Route::Player { id: id.clone() });
+            if let Some(navigator) = &navigator {
+                navigator.push(&crate::app::Route::Playlist {
+                    playlist_id: playlist_id.clone(),
+                });
             }
         })
     } else {
@@ -70,10 +70,9 @@ pub fn playlists_list() -> Html {
         html! {
                 <div class="playlist-list list">
                 {
-                    sections.iter().map(|section| {
+                    sections.iter().enumerate().map(|(index, section)| {
                         let num_videos = section.content.len();
-                        let first_video_id = section.content.first().map(|v| v.id.clone());
-                        html! { <PlaylistCard playlist_name={section.name.clone()} num_videos={num_videos} first_video_id={first_video_id} /> }
+                        html! { <PlaylistCard playlist_id={index} playlist_name={section.name.clone()} num_videos={num_videos} /> }
                     }).collect::<Html>()
                 }
                 </div>
