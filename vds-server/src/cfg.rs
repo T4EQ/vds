@@ -86,6 +86,10 @@ impl DbConfig {
     pub fn temp_manifest_path(&self) -> PathBuf {
         self.runtime_path.join("_temp_manifest.json")
     }
+
+    pub fn logfile(&self) -> PathBuf {
+        self.runtime_path.join("vds_runtime.log")
+    }
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]

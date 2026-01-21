@@ -4,6 +4,7 @@ use yew_router::prelude::*;
 use crate::context::ContentProvider;
 use crate::pages::dashboard::Dashboard;
 use crate::pages::player::VideoPlayer;
+use crate::pages::status::StatusDashboard;
 
 #[derive(Debug, Clone, PartialEq, Routable)]
 pub enum Route {
@@ -18,6 +19,9 @@ pub enum Route {
         playlist_id: usize,
         video_id: String,
     },
+
+    #[at("/status")]
+    Status,
 }
 
 fn switch(route: Route) -> Html {
@@ -41,6 +45,12 @@ fn switch(route: Route) -> Html {
             html! {
                 <VideoPlayer playlist_id={playlist_id} video_id={Some(video_id)}>
                 </VideoPlayer>
+            }
+        }
+        Route::Status => {
+            html! {
+                <StatusDashboard>
+                </StatusDashboard>
             }
         }
     }

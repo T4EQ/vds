@@ -51,6 +51,19 @@ async fn main() -> anyhow::Result<()> {
     }
     let config = vds_server::cfg::get_config(&args.config.unwrap_or_else(default_config_path))?;
 
+    let open_logfile = {
+        let logfile = config.db_config.logfile();
+        move || -> Box<dyn std::io::Write> {
+            Box::new(
+                std::fs::File::options()
+                    .create(true)
+                    .append(true)
+                    .open(&logfile)
+                    .expect("Unable to open logfile"),
+            )
+        }
+    };
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -60,6 +73,10 @@ async fn main() -> anyhow::Result<()> {
         )
         .with(JsonStorageLayer)
         .with(BunyanFormattingLayer::new("vds-server".into(), stdout))
+        .with(BunyanFormattingLayer::new(
+            "vds-server".into(),
+            open_logfile,
+        ))
         .init();
 
     let listener = TcpListener::bind(format!(

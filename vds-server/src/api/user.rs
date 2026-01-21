@@ -325,3 +325,22 @@ async fn fetch_manifest(api_data: web::Data<ApiData>) -> impl Responder {
         }
     }
 }
+
+#[tracing::instrument(
+    skip(api_data)
+    fields(
+        request_id = %uuid::Uuid::new_v4(),
+    )
+)]
+#[get("/logfile")]
+async fn log_file(api_data: web::Data<ApiData>) -> impl Responder {
+    let log = match tokio::fs::read_to_string(api_data.config.db_config.logfile()).await {
+        Ok(log) => log,
+        Err(e) => {
+            let msg = format!("Unexpected error opening file: {e:?}");
+            tracing::error!(msg);
+            return HttpResponse::InternalServerError().body(msg);
+        }
+    };
+    HttpResponse::Ok().body(log)
+}
