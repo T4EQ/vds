@@ -1,6 +1,5 @@
 use crate::context::ContentContextHandle;
 
-use base64::Engine;
 use gloo_net::http::Request;
 use vds_api::api::content::meta::get::VideoStatus;
 use wasm_bindgen_futures::spawn_local;
@@ -148,19 +147,9 @@ pub fn manifest_status(ManifestStatusProps { manifest, on_fetch }: &ManifestStat
                     }
                 }
                 </div>
-                <div class="actions button-group">
+                <div class="actions">
                     <button onclick={on_fetch.clone()} class="btn-primary">{ "Check manifest updates" }</button>
-                    {
-                        if let Some((manifest_data, _)) = manifest {
-                            let encoded_manifest_data =
-                                base64::engine::general_purpose::URL_SAFE.encode(manifest_data);
-                            let href =
-                                format!("data:application/octet-stream;charset=utf-8;base64,{encoded_manifest_data}");
-                            html! {
-                                <a href={href} download="manifest.json" class="btn-primary no-underline">{ "Download manifest" }</a>
-                            }
-                        } else { html!{} }
-                    }
+                    <a href="/api/manifest/latest" download="manifest.json" class="btn-primary no-underline">{ "Download manifest" }</a>
                 </div>
             </div>
         </div>
