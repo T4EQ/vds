@@ -36,6 +36,23 @@ impl From<crate::db::Video> for LocalVideoMeta {
     }
 }
 
+impl From<crate::build_info::BuildInfo> for vds_api::api::version::get::BuildInfo {
+    fn from(value: crate::build_info::BuildInfo) -> Self {
+        Self {
+            name: value.name.to_string(),
+            version: value.version.to_string(),
+            git_hash: value.git_hash,
+            authors: value.authors,
+            homepage: value.homepage.to_string(),
+            license: value.license.to_string(),
+            repository: value.repository.to_string(),
+            profile: value.profile.to_string(),
+            rustc_version: value.rustc_version.to_string(),
+            features: value.features.to_string(),
+        }
+    }
+}
+
 #[tracing::instrument(
     fields(
         request_id = %uuid::Uuid::new_v4(),
@@ -44,6 +61,7 @@ impl From<crate::db::Video> for LocalVideoMeta {
 #[get("/version")]
 async fn get_version() -> impl Responder {
     let info = crate::build_info::get();
+    let info: vds_api::api::version::get::Response = info.into();
     HttpResponse::Ok().json(info)
 }
 

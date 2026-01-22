@@ -42,3 +42,17 @@ pub struct GroupedSection {
     /// Content within the section. Ordered as displayed
     pub content: Vec<LocalVideoMeta>,
 }
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Clone)]
+pub struct BuildInfo {
+    pub name: String,
+    pub version: String,
+    pub git_hash: Option<String>,
+    pub authors: Vec<String>,
+    pub homepage: String,
+    pub license: String,
+    pub repository: String,
+    pub profile: String,
+    pub rustc_version: String,
+    pub features: String,
+}

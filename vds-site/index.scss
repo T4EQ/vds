@@ -287,15 +287,26 @@ h2 {
   .details {
     .row {
       display: grid;
-      grid-template-columns: 80px 1fr;
+      grid-template-columns: 120px 1fr;
       gap: 10px;
       margin-bottom: 0.5rem;
+      align-items: baseline;
 
       .label {
         color: var(--text-secondary);
       }
       .value {
         font-weight: 500;
+        word-break: break-all;
+
+        a {
+            color: var(--accent-text);
+            text-decoration: none;
+
+            &:hover {
+                text-decoration: underline;
+            }
+        }
       }
     }
   }

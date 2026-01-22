@@ -6,6 +6,8 @@ use vds_api::api::content::meta::get::VideoStatus;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
+use vds_api::api::version::get::BuildInfo;
+
 #[derive(PartialEq, Clone)]
 pub struct DownloadItem {
     pub id: String,
@@ -108,6 +110,7 @@ impl<'de> serde::Deserialize<'de> for LogEntry {
 mod parse_log_entry {}
 
 struct Status {
+    version: BuildInfo,
     logs: Vec<LogEntry>,
     manifest: Option<(String, ManifestInfo)>,
     pending_downloads: Vec<DownloadItem>,
@@ -246,6 +249,17 @@ pub fn log_viewer(LogViewerProps { logs }: &LogViewerProps) -> Html {
     }
 }
 
+async fn fetch_version_info() -> anyhow::Result<BuildInfo> {
+    let resp = Request::get("/api/version").send().await?;
+
+    if !resp.ok() {
+        anyhow::bail!("Response is not successful: {}", resp.status());
+    }
+
+    let text = resp.text().await?;
+    Ok(serde_json::from_str(&text)?)
+}
+
 async fn fetch_logs() -> anyhow::Result<Vec<LogEntry>> {
     let mut new_logs = vec![];
     let resp = Request::get("/api/logfile").send().await?;
@@ -287,6 +301,66 @@ async fn trigger_manifest_update_check() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[derive(Properties, PartialEq)]
+pub struct VersionInfoProps {
+    pub version: BuildInfo,
+}
+
+#[function_component(VersionInfo)]
+pub fn version_info(VersionInfoProps { version }: &VersionInfoProps) -> Html {
+    html! {
+        <div class="status-section">
+            <h2>{ "Build Information" }</h2>
+            <div class="card details-card">
+                <div class="details">
+                    <div class="row">
+                        <span class="label">{ "Name: " }</span>
+                        <span class="value">{ &version.name }</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">{ "Version: " }</span>
+                        <span class="value">{ &version.version }</span>
+                    </div>
+                    if let Some(git_hash) = &version.git_hash {
+                        <div class="row">
+                            <span class="label">{ "Git Hash: " }</span>
+                            <span class="value">{ git_hash }</span>
+                        </div>
+                    }
+                    <div class="row">
+                        <span class="label">{ "Authors: " }</span>
+                        <span class="value">{ for version.authors.iter().map(|author| html! { <span>{ author }</span> }) }</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">{ "Homepage: " }</span>
+                        <span class="value"><a href={ version.homepage.clone() } target="_blank">{ &version.homepage }</a></span>
+                    </div>
+                    <div class="row">
+                        <span class="label">{ "License: " }</span>
+                        <span class="value">{ &version.license }</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">{ "Repository: " }</span>
+                        <span class="value"><a href={ version.repository.clone() } target="_blank">{ &version.repository }</a></span>
+                    </div>
+                    <div class="row">
+                        <span class="label">{ "Profile: " }</span>
+                        <span class="value">{ &version.profile }</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">{ "Rustc: " }</span>
+                        <span class="value">{ &version.rustc_version }</span>
+                    </div>
+                     <div class="row">
+                        <span class="label">{ "Features: " }</span>
+                        <span class="value">{ &version.features }</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
 #[function_component(StatusDashboard)]
 pub fn status_dashboard() -> Html {
     let state_data = use_state(|| None);
@@ -302,6 +376,16 @@ pub fn status_dashboard() -> Html {
                 if let Some(sections) = context.sections.as_ref()
                     && state_data.is_none()
                 {
+                    let version = match fetch_version_info().await {
+                        Ok(logs) => logs,
+                        Err(e) => {
+                            web_sys::console::log_1(
+                                &format!("Error while fetching VDS version: {e}").into(),
+                            );
+                            return;
+                        }
+                    };
+
                     let logs = match fetch_logs().await {
                         Ok(logs) => logs,
                         Err(e) => {
@@ -334,6 +418,7 @@ pub fn status_dashboard() -> Html {
                         .collect();
 
                     state_data.set(Some(Status {
+                        version,
                         logs,
                         manifest,
                         pending_downloads,
@@ -365,6 +450,7 @@ pub fn status_dashboard() -> Html {
                             <>
                                 <ManifestStatus manifest={state_data.manifest.clone()} on_fetch={on_fetch} />
                                 <DownloadsList downloads={state_data.pending_downloads.clone()} />
+                                <VersionInfo version={state_data.version.clone()} />
                                 <LogViewer logs={state_data.logs.clone()} />
                             </>
                         }
