@@ -13,7 +13,6 @@ actix-web-static-files = "4.0"
 anyhow = "1.0"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
-base64 = "0.22.1"
 built = "0.8.0"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["derive"] }
