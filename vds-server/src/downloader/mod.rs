@@ -95,7 +95,7 @@ async fn check_updates(
     Ok(())
 }
 
-#[tracing::instrument(name = "run_downloader", skip(config, db))]
+#[tracing::instrument(name = "run_downloader", skip(config, db, cmd_receiver))]
 pub async fn run_downloader(
     config: DownloaderConfig,
     db: Arc<Database>,
