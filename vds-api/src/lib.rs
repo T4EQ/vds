@@ -22,6 +22,15 @@
 mod types;
 
 pub mod api {
+    pub mod version {
+        pub mod get {
+            pub use crate::types::BuildInfo;
+
+            /// The response to the `GET` `api/version` request
+            pub type Response = BuildInfo;
+        }
+    }
+
     pub mod content {
         pub mod meta {
             pub mod get {
