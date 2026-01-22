@@ -245,6 +245,11 @@ pub fn log_viewer(LogViewerProps { logs }: &LogViewerProps) -> Html {
                     }).collect::<Html>()
                 }
             </div>
+            <div class="card details-card">
+                <div class="actions">
+                    <a href="/api/logfile" download="vds_logs.json" class="btn-primary no-underline">{ "Download logfile" }</a>
+                </div>
+            </div>
         </div>
     }
 }
@@ -270,11 +275,16 @@ async fn fetch_logs() -> anyhow::Result<Vec<LogEntry>> {
 
     let text = resp.text().await?;
 
-    for log in text.lines() {
+    // The file might be very large, so take only the last X logs.
+    // More would not be that useful either, so we just provide a way to
+    // download them if needed
+    const MAX_LOGS: usize = 200;
+    for log in text.lines().rev().take(MAX_LOGS) {
         let log = serde_json::from_str(log)?;
         let log: LogEntry = log;
         new_logs.push(log);
     }
+    new_logs.reverse();
     Ok(new_logs)
 }
 
