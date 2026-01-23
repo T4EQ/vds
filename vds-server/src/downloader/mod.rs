@@ -138,6 +138,9 @@ pub async fn run_downloader(
         let download_manifest_task =
             tasks::download_manifest_task(download_context.clone(), cur_manifest);
         pending_task.replace(tokio::task::spawn(download_manifest_task));
+    } else {
+        // Trigger initial fetch
+        check_updates(download_context.clone(), &mut pending_task).await?;
     }
 
     loop {
