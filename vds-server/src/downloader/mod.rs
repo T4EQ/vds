@@ -135,6 +135,7 @@ pub async fn run_downloader(
     // have to spawn a download task to verify that it is actually downloaded, or fetch whatever
     // is remaining.
     if let Some(cur_manifest) = download_context.db.current_manifest().await.clone() {
+        tasks::mark_interrupted_downloads(&download_context.db, &cur_manifest).await?;
         let download_manifest_task =
             tasks::download_manifest_task(download_context.clone(), cur_manifest);
         pending_task.replace(tokio::task::spawn(download_manifest_task));

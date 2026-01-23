@@ -68,6 +68,38 @@ struct Job {
     video: Video,
 }
 
+/// When the vds-server command is interrupted, downloads that might have been previously in
+/// progress are now lost. In order to more clearly report the download state after a reboot of the
+/// server, we mark them as failed with a corresponding reason, instead of saying they are
+/// downloading with some fake progress.
+#[tracing::instrument(
+    name = "mark_interrupted_downloads",
+    skip(database, manifest),
+    fields(manifest_date = %manifest.date)
+)]
+pub async fn mark_interrupted_downloads(
+    database: &Database,
+    manifest: &ManifestFile,
+) -> anyhow::Result<()> {
+    for video in manifest.sections.iter().flat_map(|s| s.content.iter()) {
+        match database.find_video(video.id).await {
+            Ok(crate::db::Video {
+                download_status: crate::db::DownloadStatus::InProgress(_),
+                ..
+            }) => {
+                database
+                    .set_download_failed(video.id, "Download interrupted due to system restart")
+                    .await?;
+            }
+            Ok(_) | Err(crate::db::Error::Diesel(diesel::result::Error::NotFound)) => {
+                // Nothing to do, these are handled separately when starting to fetch
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(())
+}
+
 /// An async task in charge of downloading the content listed in a manifest.
 ///
 /// This task needs to be cancel-safe, because it might get cancelled by calling code if a newer
