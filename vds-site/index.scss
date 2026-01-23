@@ -201,6 +201,7 @@ h2 {
   .video-list {
     display: flex;
     flex-direction: column;
+    min-height: 200px;
 
     .card {
       margin: 4px 0;
