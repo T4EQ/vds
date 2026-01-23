@@ -1,8 +1,10 @@
+use std::str::FromStr;
+
 use actix_web::{
-    HttpResponse, Responder, get, post,
+    HttpRequest, HttpResponse, Responder, get, post,
     web::{self, Bytes, BytesMut},
 };
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tracing::instrument::Instrument;
 
 use vds_api::api::content::meta::get::{GroupedSection, LocalVideoMeta, Progress, VideoStatus};
@@ -127,7 +129,11 @@ async fn content_metadata_for_id(
     )
 )]
 #[get("/content/{id}")]
-async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> impl Responder {
+async fn get_content(
+    api_data: web::Data<ApiData>,
+    id: web::Path<String>,
+    request: HttpRequest,
+) -> impl Responder {
     let Ok(id) = id.into_inner().try_into() else {
         let msg = "Invalid video ID";
         tracing::error!(msg);
@@ -143,7 +149,7 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
         return HttpResponse::NotFound().body(msg);
     };
 
-    let mut file = match tokio::fs::File::open(filepath).await {
+    let mut file = match tokio::fs::File::open(&filepath).await {
         Ok(file) => file,
         Err(e) if e.kind() == tokio::io::ErrorKind::NotFound => {
             let msg = "Requested video is not on disk";
@@ -157,9 +163,67 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
         }
     };
 
-    const RESPONSE_CHUNK_SIZE: usize = 4096;
+    let meta = match tokio::fs::metadata(&filepath).await {
+        Ok(meta) => meta,
+        Err(e) => {
+            let msg = format!("Unexpected error getting metadata for file: {e:?}");
+            tracing::error!(msg);
+            return HttpResponse::InternalServerError().body(msg);
+        }
+    };
+
+    let total_length = meta.len();
+
+    let mut req_length = meta.len();
+
+    let range = request
+        .headers()
+        .iter()
+        .find(|(name, _)| *name == "Range")
+        .and_then(|(_, v)| {
+            v.to_str()
+                .inspect_err(|e| tracing::error!("Range header contains non-str value {e}"))
+                .ok()
+                .and_then(|v| {
+                    actix_web::http::header::Range::from_str(v)
+                        .inspect_err(|e| tracing::error!("Invalid range request: {e}"))
+                        .ok()
+                })
+        })
+        .and_then(|v| match v {
+            actix_web::http::header::Range::Bytes(ranges) => {
+                if ranges.len() != 1 {
+                    tracing::error!(
+                        "Only one byte range is currently supported, but got {ranges:?}"
+                    );
+                    None
+                } else {
+                    ranges[0]
+                        .to_satisfiable_range(total_length)
+                        .inspect(|(b, e)| tracing::debug!("Range request: {b}-{e}"))
+                }
+            }
+            actix_web::http::header::Range::Unregistered(b, e) => {
+                tracing::error!("Unsupported unregistered range request: {b}-{e}");
+                None
+            }
+        });
+
+    if let Some((begin, end)) = &range {
+        match file.seek(std::io::SeekFrom::Start(*begin)).await {
+            Ok(v) => v,
+            Err(e) => {
+                let msg = format!("Unexpected seeking file to fulfill range request: {e:?}");
+                tracing::error!(msg);
+                return HttpResponse::InternalServerError().body(msg);
+            }
+        };
+        req_length = end - begin + 1;
+    }
+
+    const RESPONSE_CHUNK_SIZE: u64 = 4096;
     let s = async_stream::stream! {
-        loop {
+        while req_length > 0 {
             // Note we are using a new bytes instance each time on purpose. We could have used
             // `split()` to get the current bytes out and reuse the instance. However, that makes
             // the bytes turn into a shared instance, which only releases the bytes once all
@@ -168,8 +232,10 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
             // This would not meet the intent of this code, which is to reduce the memory footprint
             // of this HTTP method, as some files might be hundreds of megabytes or even gigabytes
             // in size, and we only have 1 GiB of RAM for the entire platform.
-            let mut bytes = BytesMut::with_capacity(RESPONSE_CHUNK_SIZE);
-            let Ok(n) = file.read_buf(&mut bytes).await else {
+            let mut bytes = BytesMut::with_capacity(RESPONSE_CHUNK_SIZE as usize);
+            let current_chunk = req_length.min(RESPONSE_CHUNK_SIZE);
+            bytes.resize(current_chunk as usize, 0);
+            let Ok(n) = file.read_exact(&mut bytes).await else {
                 let msg = "Unable to read data from file";
                 tracing::error!(msg);
                 yield Err::<Bytes, anyhow::Error>(anyhow::anyhow!(msg));
@@ -178,14 +244,24 @@ async fn get_content(api_data: web::Data<ApiData>, id: web::Path<String>) -> imp
             if n == 0 {
                 return;
             }
-
+            req_length -= current_chunk;
             yield Ok::<Bytes, anyhow::Error>(bytes.freeze());
         }
     };
 
-    HttpResponse::Ok()
-        .content_type("video/mp4")
-        .streaming(Box::pin(s))
+    if let Some((begin, end)) = range {
+        HttpResponse::PartialContent()
+            .content_type("video/mp4")
+            .append_header((
+                "Content-Range",
+                format!("bytes {begin}-{end}/{total_length}"),
+            ))
+            .streaming(Box::pin(s))
+    } else {
+        HttpResponse::Ok()
+            .content_type("video/mp4")
+            .streaming(Box::pin(s))
+    }
 }
 
 #[tracing::instrument(
