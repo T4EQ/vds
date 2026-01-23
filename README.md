@@ -47,7 +47,7 @@ The layout of this directory is as follows:
 ### Dependencies
 
 This website relies on the following software:
-- `Rust`, `v1.92`. It is recommended you install a toolchain using [rustup](rustup.rs), to help you manage multiple installs.
+- `Rust`, `v1.91.1`. It is recommended you install a toolchain using [rustup](rustup.rs), to help you manage multiple installs.
   Alternatively, using the `nix develop` environment will include the right versions out of the box.
 - `trunk`, `v0.21` application bundler. See install instructions [here](https://trunkrs.dev/) 
 - _Optional:_ `Nix` package manager. See install instructions [here](https://nixos.org/download/).
