@@ -123,3 +123,15 @@ to a subdirectory inside this repository.
 Note that you do _not_ need `Nix` to use the right versions of the rust toolchain. Installing `Rust` 
 via `rustup.rs` will make sure you get the right toolchain (indicated in the `rust-toolchain.toml`) 
 file every time you run cargo.
+
+### Build with Nix for the target
+
+```sh
+nix build --extra-experimental-features 'nix-command flakes' .#vds-target
+```
+
+A static binary will be present under the `result/bin/vds-server` path, compiled for the aarch64 architecture.
+
+Note that this build can be particularly slow if you are building on an x64 computer, because it is 
+cross compiling to aarch64 and running aarch64 binaries. In order to run aarch64 binaries, you might 
+need to register an interpreter for aarch64 elf binaries using [binfmt](https://man.archlinux.org/man/binfmt.d.5.en).
