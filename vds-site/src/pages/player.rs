@@ -185,7 +185,7 @@ pub fn video_player(
                             let playlist_id = *playlist_id;
                             let video_id = video.id.clone();
                             Callback::from(move |_| {
-                                navigator.replace(&crate::app::Route::Video { playlist_id: playlist_id, video_id: video_id.clone() });
+                                navigator.replace(&crate::app::Route::Video { playlist_id , video_id: video_id.clone() });
                             })
                         } else {
                             Callback::noop()
