@@ -25,9 +25,7 @@ pub fn playlist_card(
         let playlist_id = *playlist_id;
         Callback::from(move |_| {
             if let Some(navigator) = &navigator {
-                navigator.push(&crate::app::Route::Playlist {
-                    playlist_id: playlist_id,
-                });
+                navigator.push(&crate::app::Route::Playlist { playlist_id });
             }
         })
     } else {
