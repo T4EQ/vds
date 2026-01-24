@@ -59,7 +59,8 @@ async fn main() -> anyhow::Result<()> {
                     .create(true)
                     .append(true)
                     .open(&logfile)
-                    .expect("Unable to open logfile"),
+                    .map_err(|e| format!("Unable to open logfile {logfile:?}: {e}"))
+                    .unwrap(),
             )
         }
     };

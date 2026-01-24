@@ -106,8 +106,6 @@ impl<'de> serde::Deserialize<'de> for LogEntry {
     }
 }
 
-mod parse_log_entry {}
-
 struct Status {
     version: BuildInfo,
     logs: Vec<LogEntry>,
@@ -123,6 +121,7 @@ pub struct ManifestStatusProps {
 
 #[function_component(ManifestStatus)]
 pub fn manifest_status(ManifestStatusProps { manifest, on_fetch }: &ManifestStatusProps) -> Html {
+    let has_manifest = manifest.is_some();
     html! {
         <div class="status-section">
             <h2>{ "Current Manifest" }</h2>
@@ -148,8 +147,8 @@ pub fn manifest_status(ManifestStatusProps { manifest, on_fetch }: &ManifestStat
                 }
                 </div>
                 <div class="actions">
-                    <button onclick={on_fetch.clone()} class="btn-primary">{ "Check manifest updates" }</button>
-                    <a href="/api/manifest/latest" download="manifest.json" class="btn-primary no-underline">{ "Download manifest" }</a>
+                    <button onclick={on_fetch.clone()} class="btn btn-primary">{ "Check manifest updates" }</button>
+                    <a href="/api/manifest/latest" download="manifest.json" class={ classes!("btn", "btn-primary", "no-underline", (!has_manifest).then_some("disabled"))}>{ "Download manifest" }</a>
                 </div>
             </div>
         </div>
@@ -184,7 +183,7 @@ pub fn downloads_list(DownloadsListProps { downloads }: &DownloadsListProps) -> 
                                     { match &item.status {
                                         VideoStatus::Pending => "Pending".to_string(),
                                         VideoStatus::Downloading(p) => format!("Downloading ({:.0}%)", p.0 * 100.0),
-                                        VideoStatus::Failed(_) => "Failed".to_string(),
+                                        VideoStatus::Failed(msg) => format!("Failed: {msg}"),
                                     VideoStatus::Downloaded => "Downloaded".to_string(),
                                     }}
                                 </span>
