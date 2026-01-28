@@ -28,6 +28,7 @@ pub async fn run_app(listener: TcpListener, config: VdsConfig) -> anyhow::Result
 
     let downloader = downloader::run_downloader(
         config.downloader_config.clone(),
+        config.aws_config.clone(),
         Arc::clone(&database),
         user_command_receiver,
     );

@@ -93,6 +93,13 @@ impl DbConfig {
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
+pub struct AwsConfig {
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub region: String,
+}
+
+#[derive(serde::Deserialize, Debug, Clone)]
 pub struct VdsConfig {
     /// Enables debug logging/tracing.
     pub debug: bool,
@@ -105,6 +112,9 @@ pub struct VdsConfig {
 
     /// Database configuration
     pub db_config: DbConfig,
+
+    /// AWS configuration (optional)
+    pub aws_config: Option<AwsConfig>,
 }
 
 /// Parses the configuration of the VDS, returning a VdsConfig struct.

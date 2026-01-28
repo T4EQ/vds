@@ -257,8 +257,8 @@ async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), Downloa
             Ok(v) => v,
             Err(err) => {
                 let error_msg = format!(
-                    "Error fetching file with id: {}, name: {}. Error: {}",
-                    video.id, video.name, err
+                    "Error fetching file with id: {}, name: {}. path: {}. Error: {}.",
+                    video.id, video.name, video.uri, err
                 );
                 tracing::error!("{error_msg}");
 
@@ -300,7 +300,7 @@ async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), Downloa
     }
 
     translate_error(ctx.db.set_downloaded(video.id, &target_filepath).await)?;
-    tracing::info!("Video downloaded sueccessfully to: {target_filepath:?}");
+    tracing::info!("Video downloaded successfully to: {target_filepath:?}");
     Ok(())
 }
 
