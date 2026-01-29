@@ -642,7 +642,7 @@ pub mod test {
             matches_pattern!(crate::db::Video {
                 id: &id,
                 download_status: matches_pattern!(crate::db::DownloadStatus::Failed(eq(
-                    "Error fetching file with id: 5eb9e089-79cf-478d-9121-9ca3e7bb1d4a, name: Quadratic equations. Error: I/O error reading from backend: "
+                    "Error fetching file with id: 5eb9e089-79cf-478d-9121-9ca3e7bb1d4a, name: Quadratic equations. path: s3://bucket/quadratic-equations.mp4. Error: I/O error reading from backend: ."
                 ))),
                 ..
             })
