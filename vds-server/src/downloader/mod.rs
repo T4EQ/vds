@@ -4,7 +4,10 @@ mod tasks;
 
 use std::{path::PathBuf, sync::Arc};
 
-use crate::{cfg::{DownloaderConfig, AwsConfig}, db::Database};
+use crate::{
+    cfg::{AwsConfig, DownloaderConfig},
+    db::Database,
+};
 use backend::FileBackend;
 use s3backend::S3Backend;
 
@@ -116,10 +119,12 @@ pub async fn run_downloader(
             Arc::new(FileBackend::new(&path))
         }
         Some("s3") => {
-            let bucket = config.remote_server.host()
+            let bucket = config
+                .remote_server
+                .host()
                 .ok_or_else(|| anyhow::anyhow!("S3 URI must specify a bucket name"))?;
             tracing::info!("Using S3 backend with bucket: {bucket}");
-            
+
             // Pass aws_config that was passed as parameter
             Arc::new(S3Backend::new(bucket, aws_config.as_ref()).await?)
         }
