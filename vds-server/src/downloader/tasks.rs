@@ -1,5 +1,5 @@
 use crate::{
-    db::Database,
+    db::{Database, DownloadStatus},
     manifest::{ManifestFile, Video},
 };
 
@@ -42,6 +42,7 @@ pub async fn publish_manifest(db: &Database, new_manifest: &ManifestFile) {
 /// adopted.
 #[tracing::instrument(name = "remove_old_video_content", skip(database, new_manifest))]
 pub async fn remove_old_video_content(
+    content_path: &std::path::Path,
     database: &Database,
     new_manifest: &ManifestFile,
 ) -> anyhow::Result<()> {
@@ -56,6 +57,16 @@ pub async fn remove_old_video_content(
     for video in database.list_all_videos().await? {
         if !in_manifest(video.id) {
             database.delete_video(video.id).await?;
+            if let DownloadStatus::Downloaded(path) = video.download_status {
+                tokio::fs::remove_file(path).await?;
+            } else {
+                // Try to remove it from the current runtime_path. Not only fully downloaded videos
+                // need to be deleted.
+                let path = content_path.join(format!("{}.mp4", video.id));
+                // The file might already not exist, if the download never started. Therefore we
+                // don't error out and do best effort deletion here.
+                let _ = tokio::fs::remove_file(path).await;
+            }
         }
     }
 
@@ -121,7 +132,7 @@ pub async fn download_manifest_task(
     publish_manifest(&ctx.db, &new_manifest).await;
 
     // Mark older content for deletion
-    remove_old_video_content(&ctx.db, &new_manifest).await?;
+    remove_old_video_content(&ctx.config.content_path, &ctx.db, &new_manifest).await?;
 
     // Collect the content that we need to download
     let mut pending_downloads: VecDeque<Job> = VecDeque::new();
@@ -561,7 +572,18 @@ pub mod test {
 
         initialize_video_entries(db, &manifest).await.or_fail()?;
 
-        remove_old_video_content(db, &new_manifest)
+        for video in manifest.sections.iter().flat_map(|s| s.content.iter()) {
+            // Create a partial video file that should be deleted
+            let p = ctx
+                .download_ctx
+                .config
+                .content_path
+                .join(format!("{}.mp4", video.id));
+
+            tokio::fs::write(p, b"Dummy content").await.or_fail()?;
+        }
+
+        remove_old_video_content(&ctx.download_ctx.config.content_path, db, &new_manifest)
             .await
             .or_fail()?;
 
@@ -574,6 +596,12 @@ pub mod test {
                 .flat_map(|s| s.content.iter())
                 .any(|v| v.id == video.id);
 
+            let p = ctx
+                .download_ctx
+                .config
+                .content_path
+                .join(format!("{}.mp4", video.id));
+
             if in_new_manifest {
                 expect_that!(
                     db_video,
@@ -585,6 +613,8 @@ pub mod test {
                         view_count: 0,
                     }))
                 );
+                let content = tokio::fs::read_to_string(p).await.or_fail()?;
+                expect_that!(content, eq("Dummy content"));
             } else {
                 expect_that!(
                     db_video,
@@ -592,6 +622,7 @@ pub mod test {
                         matches_pattern!(diesel::result::Error::NotFound)
                     )))
                 );
+                expect_false!(p.exists());
             }
         }
 
