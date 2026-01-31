@@ -4,7 +4,6 @@ use crate::downloader::Error;
 use crate::downloader::backend::{Backend, ChunkResult}; // Change this line
 
 use async_stream::stream;
-use aws_config::BehaviorVersion;
 use aws_sdk_s3::Client;
 use tokio_stream::Stream;
 
@@ -20,16 +19,19 @@ impl S3Backend {
     ) -> anyhow::Result<Self> {
         tracing::info!("Initializing S3 backend for bucket: {}", bucket);
 
-        let (access_key, secret_key, region) = if let Some(cfg) = aws_config {
+        let (endpoint_url, access_key, secret_key, region) = if let Some(cfg) = aws_config {
             tracing::debug!("✓ Using AWS credentials from config file");
+            tracing::debug!("✓ Endpoint URL: {:?}", cfg.endpoint_url);
             tracing::debug!("✓ AWS Region: {}", cfg.region);
             (
+                cfg.endpoint_url.clone(),
                 cfg.access_key_id.clone(),
                 cfg.secret_access_key.clone(),
                 cfg.region.clone(),
             )
         } else {
             // Fall back to environment variables
+            let endpoint_url = std::env::var("AWS_ENDPOINT_URL").ok();
             let access_key = std::env::var("AWS_ACCESS_KEY_ID").map_err(|_| {
                 anyhow::anyhow!("AWS_ACCESS_KEY_ID not set in environment or config")
             })?;
@@ -41,8 +43,9 @@ impl S3Backend {
                 .map_err(|_| anyhow::anyhow!("AWS_REGION not set in environment or config"))?;
 
             tracing::debug!("✓ Using AWS credentials from environment variables");
+            tracing::debug!("✓ Endpoint URL: {:?}", endpoint_url);
             tracing::debug!("✓ AWS Region: {}", region);
-            (access_key, secret_key, region)
+            (endpoint_url, access_key, secret_key, region)
         };
 
         // Build AWS config with explicit credentials
@@ -51,14 +54,27 @@ impl S3Backend {
 
         let retry_config = aws_config::retry::RetryConfig::standard().with_max_attempts(3);
 
-        let config = aws_config::defaults(BehaviorVersion::latest())
-            .region(aws_config::Region::new(region))
+        let config_loader = aws_sdk_s3::Config::builder()
+            .behavior_version_latest()
             .credentials_provider(creds)
-            .retry_config(retry_config)
-            .load()
-            .await;
+            .region(aws_sdk_s3::config::Region::new(region))
+            .retry_config(retry_config);
 
-        let client = Client::new(&config);
+        let config = if let Some(endpoint_url) = endpoint_url {
+            config_loader
+                .endpoint_url(endpoint_url)
+                .force_path_style(
+                    aws_config
+                        .as_ref()
+                        .map(|c| c.force_path_style)
+                        .unwrap_or(true),
+                )
+                .build()
+        } else {
+            config_loader.build()
+        };
+
+        let client = Client::from_conf(config);
 
         // Verify bucket access
         client
@@ -103,13 +119,10 @@ impl S3Backend {
                 tracing::error!("  - Missing s3:GetObject permission");
                 tracing::error!("  - Invalid AWS credentials");
                 tracing::error!("  - Network connectivity issue");
-                Error::IoError(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!(
-                        "Failed to get S3 object s3://{}/{}: {}",
-                        self.bucket, key, e
-                    ),
-                ))
+                Error::IoError(std::io::Error::other(format!(
+                    "Failed to get S3 object s3://{}/{}: {}",
+                    self.bucket, key, e
+                )))
             })
     }
 }
@@ -146,8 +159,7 @@ impl Backend for S3Backend {
                     }
                     Some(Err(e)) => {
                         tracing::error!("Error reading S3 stream for s3://{}/{}: {}", self.bucket, key, e);
-                        yield Err(Error::IoError(std::io::Error::new(
-                            std::io::ErrorKind::Other,
+                        yield Err(Error::IoError(std::io::Error::other(
                             format!("Error reading S3 stream: {}", e)
                         )));
                         return;

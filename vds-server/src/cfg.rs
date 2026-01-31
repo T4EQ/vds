@@ -12,6 +12,10 @@ fn default_listen_port() -> u16 {
     8080
 }
 
+fn default_path_style() -> bool {
+    false
+}
+
 #[derive(serde::Deserialize, Debug, Clone)]
 pub struct HttpServerConfig {
     /// Address/interface to listen for TCP connections.
@@ -94,6 +98,9 @@ impl DbConfig {
 
 #[derive(serde::Deserialize, Debug, Clone)]
 pub struct AwsConfig {
+    pub endpoint_url: Option<String>,
+    #[serde(default = "default_path_style")]
+    pub force_path_style: bool,
     pub access_key_id: String,
     pub secret_access_key: String,
     pub region: String,
