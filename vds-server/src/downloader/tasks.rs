@@ -268,8 +268,8 @@ async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), Downloa
             Ok(v) => v,
             Err(err) => {
                 let error_msg = format!(
-                    "Error fetching file with id: {}, name: {}. Error: {}",
-                    video.id, video.name, err
+                    "Error fetching file with id: {}, name: {}. path: {}. Error: {}.",
+                    video.id, video.name, video.uri, err
                 );
                 tracing::error!("{error_msg}");
 
@@ -311,7 +311,7 @@ async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), Downloa
     }
 
     translate_error(ctx.db.set_downloaded(video.id, &target_filepath).await)?;
-    tracing::info!("Video downloaded sueccessfully to: {target_filepath:?}");
+    tracing::info!("Video downloaded successfully to: {target_filepath:?}");
     Ok(())
 }
 
@@ -673,7 +673,7 @@ pub mod test {
             matches_pattern!(crate::db::Video {
                 id: &id,
                 download_status: matches_pattern!(crate::db::DownloadStatus::Failed(eq(
-                    "Error fetching file with id: 5eb9e089-79cf-478d-9121-9ca3e7bb1d4a, name: Quadratic equations. Error: I/O error reading from backend: "
+                    "Error fetching file with id: 5eb9e089-79cf-478d-9121-9ca3e7bb1d4a, name: Quadratic equations. path: s3://bucket/quadratic-equations.mp4. Error: I/O error reading from backend: ."
                 ))),
                 ..
             })

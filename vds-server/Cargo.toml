@@ -41,6 +41,8 @@ tracing-subscriber.workspace = true
 tracing.workspace = true
 uuid.workspace = true
 vds-api.path = "../vds-api"
+aws-config = "1.8.12"
+aws-sdk-s3 = "1.120.0"
 
 [dev-dependencies]
 googletest.workspace = true
