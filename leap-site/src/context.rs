@@ -3,7 +3,7 @@ use std::rc::Rc;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use vds_api::api::content::meta::get::{GroupedSection, Response};
+use leap_api::api::content::meta::get::{GroupedSection, Response};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ContentContext {

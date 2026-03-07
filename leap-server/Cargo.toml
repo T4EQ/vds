@@ -1,12 +1,12 @@
 [package]
-name = "vds-server"
+name = "leap-server"
 version = "0.1.0"
 edition = "2024"
 description = "Video delivery system main application"
 license = "MIT OR Apache-2.0"
 authors = ["Javier Alvarez <javier.alvarez@allthingsembedded.net>", "Johannes Frohnhofen <johannes@frohnhofen.com>", "Sivaranjini Chithambaram <sichitha@microsoft.com>"]
-homepage = "https://github.com/t4eq/vds"
-repository = "https://github.com/t4eq/vds"
+homepage = "https://github.com/t4eq/leap"
+repository = "https://github.com/t4eq/leap"
 
 [features]
 default = ["git2"]
@@ -26,6 +26,7 @@ diesel.workspace = true
 diesel_migrations.workspace = true
 http.workspace = true
 humantime-serde.workspace = true
+leap-api.path = "../leap-api"
 libsqlite3-sys.workspace = true
 regex.workspace = true
 serde.workspace = true
@@ -40,7 +41,6 @@ tracing-bunyan-formatter.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 uuid.workspace = true
-vds-api.path = "../vds-api"
 
 [dev-dependencies]
 googletest.workspace = true

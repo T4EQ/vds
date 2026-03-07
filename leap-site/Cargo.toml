@@ -1,21 +1,22 @@
 [package]
-name = "vds-site"
+name = "leap-site"
 version = "0.1.0"
 edition = "2024"
 description = "Video delivery system frontend site"
 license = "MIT OR Apache-2.0"
 authors = ["Javier Alvarez <javier.alvarez@allthingsembedded.net>", "Johannes Frohnhofen <johannes@frohnhofen.com>", "Sivaranjini Chithambaram <sichitha@microsoft.com>"]
-homepage = "https://github.com/t4eq/vds"
-repository = "https://github.com/t4eq/vds"
+homepage = "https://github.com/t4eq/leap"
+repository = "https://github.com/t4eq/leap"
 
 [dependencies]
 anyhow.workspace = true
 gloo-net.workspace = true
+leap-api.path = "../leap-api"
 log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-vds-api.path = "../vds-api"
 wasm-bindgen-futures.workspace = true
+wasm-bindgen.workspace = true
 wasm-logger.workspace = true
 web-sys.workspace = true
 yew-router.workspace = true

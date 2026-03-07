@@ -6,7 +6,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser, Debug)]
 struct Args {
-    /// Path to the VDS configuration
+    /// Path to the LEAP configuration
     #[arg(short, long)]
     config: Option<PathBuf>,
 
@@ -16,11 +16,11 @@ struct Args {
 }
 
 fn default_config_path() -> PathBuf {
-    "/var/lib/vds/config/config.toml".into()
+    "/var/lib/leap/config/config.toml".into()
 }
 
 fn print_version_info() {
-    let info = vds_server::build_info::get();
+    let info = leap_server::build_info::get();
     println!("{}:", info.name);
     println!("\tVersion: {}", info.version);
     if let Some(git_hash) = &info.git_hash {
@@ -49,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
         print_version_info();
         return Ok(());
     }
-    let config = vds_server::cfg::get_config(&args.config.unwrap_or_else(default_config_path))?;
+    let config = leap_server::cfg::get_config(&args.config.unwrap_or_else(default_config_path))?;
 
     let open_logfile = {
         let logfile = config.db_config.logfile();
@@ -73,9 +73,9 @@ async fn main() -> anyhow::Result<()> {
             }),
         )
         .with(JsonStorageLayer)
-        .with(BunyanFormattingLayer::new("vds-server".into(), stdout))
+        .with(BunyanFormattingLayer::new("leap-server".into(), stdout))
         .with(BunyanFormattingLayer::new(
-            "vds-server".into(),
+            "leap-server".into(),
             open_logfile,
         ))
         .init();
@@ -86,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
     ))?;
 
     println!("Started server at http://{}", listener.local_addr()?);
-    vds_server::run_app(listener, config).await?;
+    leap_server::run_app(listener, config).await?;
 
     Ok(())
 }

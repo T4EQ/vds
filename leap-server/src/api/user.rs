@@ -7,7 +7,7 @@ use actix_web::{
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tracing::instrument::Instrument;
 
-use vds_api::api::content::meta::get::{GroupedSection, LocalVideoMeta, Progress, VideoStatus};
+use leap_api::api::content::meta::get::{GroupedSection, LocalVideoMeta, Progress, VideoStatus};
 
 use crate::{api::ApiData, downloader::UserCommand};
 
@@ -36,7 +36,7 @@ impl From<crate::db::Video> for LocalVideoMeta {
     }
 }
 
-impl From<crate::build_info::BuildInfo> for vds_api::api::version::get::BuildInfo {
+impl From<crate::build_info::BuildInfo> for leap_api::api::version::get::BuildInfo {
     fn from(value: crate::build_info::BuildInfo) -> Self {
         Self {
             name: value.name.to_string(),
@@ -61,7 +61,7 @@ impl From<crate::build_info::BuildInfo> for vds_api::api::version::get::BuildInf
 #[get("/version")]
 async fn get_version() -> impl Responder {
     let info = crate::build_info::get();
-    let info: vds_api::api::version::get::Response = info.into();
+    let info: leap_api::api::version::get::Response = info.into();
     HttpResponse::Ok().json(info)
 }
 
@@ -73,7 +73,7 @@ async fn get_version() -> impl Responder {
 )]
 #[get("/content/meta")]
 async fn list_content_metadata(api_data: web::Data<ApiData>) -> impl Responder {
-    use vds_api::api::content::meta::get::Response;
+    use leap_api::api::content::meta::get::Response;
 
     let sections = match api_data
         .db
@@ -116,7 +116,7 @@ async fn content_metadata_for_id(
     api_data: web::Data<ApiData>,
     id: web::Path<String>,
 ) -> impl Responder {
-    use vds_api::api::content::meta::id::get::Response;
+    use leap_api::api::content::meta::id::get::Response;
     let Ok(id) = id.into_inner().try_into() else {
         return HttpResponse::BadRequest().body("Invalid video ID");
     };

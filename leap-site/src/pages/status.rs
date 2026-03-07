@@ -1,11 +1,11 @@
 use crate::context::ContentContextHandle;
 
 use gloo_net::http::Request;
-use vds_api::api::content::meta::get::VideoStatus;
+use leap_api::api::content::meta::get::VideoStatus;
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 
-use vds_api::api::version::get::BuildInfo;
+use leap_api::api::version::get::BuildInfo;
 
 #[derive(PartialEq, Clone)]
 pub struct DownloadItem {
@@ -235,7 +235,7 @@ pub fn log_viewer(LogViewerProps { logs }: &LogViewerProps) -> Html {
             </div>
             <div class="card details-card">
                 <div class="actions">
-                    <a href="/api/logfile" download="vds_logs.json" class="btn-primary no-underline">{ "Download logfile" }</a>
+                    <a href="/api/logfile" download="leap_logs.json" class="btn-primary no-underline">{ "Download logfile" }</a>
                 </div>
             </div>
         </div>
@@ -378,7 +378,7 @@ pub fn status_dashboard() -> Html {
                         Ok(logs) => logs,
                         Err(e) => {
                             web_sys::console::log_1(
-                                &format!("Error while fetching VDS version: {e}").into(),
+                                &format!("Error while fetching LEAP version: {e}").into(),
                             );
                             return;
                         }
@@ -388,7 +388,7 @@ pub fn status_dashboard() -> Html {
                         Ok(logs) => logs,
                         Err(e) => {
                             web_sys::console::log_1(
-                                &format!("Error while fetching VDS logs: {e}").into(),
+                                &format!("Error while fetching LEAP logs: {e}").into(),
                             );
                             return;
                         }
