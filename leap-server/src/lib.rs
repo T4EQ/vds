@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 
 use std::{net::TcpListener, sync::Arc};
 
-use crate::cfg::VdsConfig;
+use crate::cfg::LeapConfig;
 
 pub mod build_info;
 pub mod cfg;
@@ -15,7 +15,7 @@ mod downloader;
 mod manifest;
 mod static_files;
 
-pub async fn run_app(listener: TcpListener, config: VdsConfig) -> anyhow::Result<()> {
+pub async fn run_app(listener: TcpListener, config: LeapConfig) -> anyhow::Result<()> {
     let database = Arc::new(
         db::Database::open(config.db_config.clone())
             .await

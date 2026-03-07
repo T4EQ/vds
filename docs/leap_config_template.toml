@@ -1,14 +1,14 @@
 debug = false
 
 [db_config]
-runtime_path = "/tmp/vds/runtime_path"
+runtime_path = "/tmp/leap/runtime_path"
 busy_timeout = "10 seconds"
 pool_size = 16
 
 [downloader_config]
 concurrent_downloads = 8
-content_path = "/tmp/vds/content_path"
-remote_server = "/tmp/vds/fake_remote_server"
+content_path = "/tmp/leap/content_path"
+remote_server = "/tmp/leap/fake_remote_server"
 update_interval = "20 seconds"
 
 [downloader_config.retry_params]

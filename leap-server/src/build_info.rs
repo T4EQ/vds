@@ -1,4 +1,4 @@
-/// VDS build information compiled into the vds-server binary
+/// LEAP build information compiled into the leap-server binary
 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Clone)]
 pub struct BuildInfo {
     pub name: &'static str,
@@ -29,7 +29,7 @@ fn git_hash() -> Option<String> {
 
 #[cfg(not(feature = "git2"))]
 fn git_hash() -> Option<String> {
-    std::option_env!("VDS_SERVER_NIX_GIT_REVISION").map(|git_hash| git_hash.to_string())
+    std::option_env!("LEAP_SERVER_NIX_GIT_REVISION").map(|git_hash| git_hash.to_string())
 }
 
 pub fn get() -> BuildInfo {

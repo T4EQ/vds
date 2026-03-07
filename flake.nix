@@ -1,5 +1,5 @@
 {
-  description = "Video Delivery System";
+  description = "Low-Bandwidth Educational Access Platform";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -28,7 +28,7 @@
       # Note that these pacakges do not obey the rust-toolchain.toml. Unfortunately, building the
       # toolchains from the rust-toolchain.toml files would take way too long. Maybe we could
       # do this if we setup a nix cache, but for now this will do.
-      vdsPackageWithPkgs =
+      leapPackageWithPkgs =
         pkgs: targetPkgs:
         let
           # Get git revision. Nix removes the .git repository when building so that the build reproducibility
@@ -41,7 +41,7 @@
           # the target toolchain (aarch64-unknown-linux-musl), so we need to use a nix cross-compilation
           # strategy there
           site = pkgs.rustPlatform.buildRustPackage {
-            pname = "vds-site";
+            pname = "leap-site";
             version = "0.1.0";
             src = ./.;
 
@@ -58,7 +58,7 @@
 
             buildPhase = "
               runHook preBuild
-              pushd vds-site
+              pushd leap-site
               trunk build --release --offline
               popd
               runHook postBuild
@@ -66,7 +66,7 @@
 
             installPhase = "
               runHook preInstall
-              pushd vds-site
+              pushd leap-site
               mkdir -p $out
               cp -r dist $out/
               popd
@@ -75,7 +75,7 @@
           };
         in
         targetPkgs.rustPlatform.buildRustPackage {
-          pname = "vds-server";
+          pname = "leap-server";
           version = "0.1.0";
           src = ./.;
 
@@ -89,10 +89,10 @@
 
           buildPhase = "
             runHook preBuild
-            pushd vds-server
-            export VDS_SERVER_FRONTEND_PATH=${site}/dist
+            pushd leap-server
+            export LEAP_SERVER_FRONTEND_PATH=${site}/dist
             export CARGO_TARGET_DIR=$(pwd)/../target
-            export VDS_SERVER_NIX_GIT_REVISION=${git-rev}
+            export LEAP_SERVER_NIX_GIT_REVISION=${git-rev}
             cargo build --release --offline -j $NIX_BUILD_CORES --target ${targetPkgs.stdenv.hostPlatform.rust.rustcTarget} --no-default-features
             popd
             runHook postBuild
@@ -114,12 +114,12 @@
         in
         rec {
           # Local target
-          vds = vdsPackageWithPkgs pkgs pkgs;
+          leap = leapPackageWithPkgs pkgs pkgs;
 
           # Cross compilation for RPi 4
-          vds-target = vdsPackageWithPkgs pkgs targetPkgs;
+          leap-target = leapPackageWithPkgs pkgs targetPkgs;
 
-          default = vds;
+          default = leap;
         }
       );
 
@@ -137,7 +137,7 @@
           };
         in
         rec {
-          vds = pkgs.mkShell {
+          leap = pkgs.mkShell {
             nativeBuildInputs = [
               (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
               pkgs.trunk
@@ -150,7 +150,7 @@
             ];
           };
 
-          default = vds;
+          default = leap;
         }
       );
     };

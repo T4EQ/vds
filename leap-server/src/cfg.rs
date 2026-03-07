@@ -46,7 +46,7 @@ pub struct DownloaderConfig {
     /// The read/writeable path where the video files will be stored.
     pub content_path: PathBuf,
 
-    /// URI of the remote server providing the manifest and content cached by the VDS.
+    /// URI of the remote server providing the manifest and content cached by the LEAP.
     #[serde(with = "parse_uri")]
     pub remote_server: Uri,
 
@@ -76,7 +76,7 @@ pub struct DbConfig {
 
 impl DbConfig {
     pub fn db_path(&self) -> PathBuf {
-        self.runtime_path.join("vds.db")
+        self.runtime_path.join("leap.db")
     }
 
     pub fn manifest_path(&self) -> PathBuf {
@@ -88,12 +88,12 @@ impl DbConfig {
     }
 
     pub fn logfile(&self) -> PathBuf {
-        self.runtime_path.join("vds_runtime.log")
+        self.runtime_path.join("leap_runtime.log")
     }
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
-pub struct VdsConfig {
+pub struct LeapConfig {
     /// Enables debug logging/tracing.
     pub debug: bool,
 
@@ -107,22 +107,22 @@ pub struct VdsConfig {
     pub db_config: DbConfig,
 }
 
-/// Parses the configuration of the VDS, returning a VdsConfig struct.
+/// Parses the configuration of the LEAP, returning a LeapConfig struct.
 /// Uses the given path to read a structured file format (toml, yaml, json, etc).
-/// Individual values can be overriden by `VDS_`-prefixed environment variables.
-pub fn get_config(path: &Path) -> Result<VdsConfig> {
+/// Individual values can be overriden by `LEAP_`-prefixed environment variables.
+pub fn get_config(path: &Path) -> Result<LeapConfig> {
     let config = Config::builder()
         .add_source(config::File::with_name(
             path.to_str()
                 .context("Parsing configuration path as a str")?,
         ))
-        .add_source(config::Environment::with_prefix("VDS"))
+        .add_source(config::Environment::with_prefix("LEAP"))
         .build()
-        .context("Building the configuration of the VDS from file and environment")?;
+        .context("Building the configuration of the LEAP from file and environment")?;
 
     config
         .try_deserialize()
-        .context("Deserializing the configuration as VdsConfig")
+        .context("Deserializing the configuration as LeapConfig")
 }
 
 mod parse_uri {

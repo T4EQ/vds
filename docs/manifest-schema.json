@@ -1,8 +1,8 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "http://t4eq.github.io/schemas/vds-manifest.json",
-    "title": "VDS Manifest",
-    "description": "Describes data to be cached by the VDS",
+    "$id": "http://t4eq.github.io/schemas/leap-manifest.json",
+    "title": "LEAP Manifest",
+    "description": "Describes data to be cached by the LEAP",
     "$defs": {
         "Section": {
             "description": "A grouping of videos who belong to the same topic.",

@@ -109,7 +109,7 @@ pub struct Section {
     pub content: Vec<Video>,
 }
 
-/// Describes the set of videos and sections to be shown in the VDS.
+/// Describes the set of videos and sections to be shown in the LEAP.
 #[derive(Debug, serde::Deserialize, serde::Serialize, PartialEq, Eq, Clone)]
 pub struct ManifestFile {
     /// Name of the distribution list

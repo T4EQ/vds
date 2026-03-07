@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{cfg::VdsConfig, db::Database, downloader::UserCommand};
+use crate::{cfg::LeapConfig, db::Database, downloader::UserCommand};
 
 use actix_web::web;
 use tokio::sync::mpsc::UnboundedSender;
@@ -9,14 +9,14 @@ mod user;
 
 /// Shared resources used in HTTP handlers
 pub struct ApiData {
-    config: VdsConfig,
+    config: LeapConfig,
     db: Arc<Database>,
     cmd_sender: UnboundedSender<UserCommand>,
 }
 
 impl ApiData {
     pub fn new(
-        config: VdsConfig,
+        config: LeapConfig,
         db: Arc<Database>,
         cmd_sender: UnboundedSender<UserCommand>,
     ) -> Self {
