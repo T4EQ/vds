@@ -1,6 +1,6 @@
 use crate::context::ContentContextHandle;
 use gloo_net::http::Request;
-use vds_api::api::content::meta::get::VideoStatus::{Downloaded, Downloading, Failed, Pending};
+use leap_api::api::content::meta::get::VideoStatus::{Downloaded, Downloading, Failed, Pending};
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
 use yew_router::prelude::*;

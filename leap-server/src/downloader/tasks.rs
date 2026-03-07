@@ -79,7 +79,7 @@ struct Job {
     video: Video,
 }
 
-/// When the vds-server command is interrupted, downloads that might have been previously in
+/// When the leap-server command is interrupted, downloads that might have been previously in
 /// progress are now lost. In order to more clearly report the download state after a reboot of the
 /// server, we mark them as failed with a corresponding reason, instead of saying they are
 /// downloading with some fake progress.

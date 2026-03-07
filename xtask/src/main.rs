@@ -46,7 +46,7 @@ fn build(args: &BuildArgs) -> anyhow::Result<()> {
     // First build the frontend and package it using trunk
     let shell = xshell::Shell::new()?;
     {
-        let _dir = shell.push_dir("vds-site");
+        let _dir = shell.push_dir("leap-site");
         cmd!(shell, "trunk build {offline...} {release...}").run()?;
     }
 
@@ -67,7 +67,7 @@ fn run(args: &RunArgs) -> anyhow::Result<()> {
     let shell = xshell::Shell::new()?;
     cmd!(
         shell,
-        "cargo run {release...} --bin vds-server -- --config ./docs/vds_config_template.toml"
+        "cargo run {release...} --bin leap-server -- --config ./docs/leap_config_template.toml"
     )
     .run()?;
 

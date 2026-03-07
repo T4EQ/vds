@@ -1,20 +1,20 @@
-# Offline Video Delivery System
+# Low-Bandwidth Educational Access Platform
 
 [AID India](https://aidindia.in/) helps to bring education and educational resources to children in remote villages of India.
 These villages often face challenges with the stability of their internet connections. In such an environment,
 serving quality lectures can be challenging due to constraints of bandwidth, cost and latency.
 
-The `Offline Video Delivery System` (`VDS`) is the result of a collaboration between AID India and T4EQ in an
+The `Low-Bandwidth Educational Access Platform` (`LEAP`) is the result of a collaboration between AID India and T4EQ in an
 attempt to bring quality educational videos to these children by caching the content locally at the
 point where the data is served.
 
-The `VDS` system consists of:
+The `LEAP` system consists of:
 - A frontend video player
 - A backend serving locally cached video content to devices in a local network.
 - A management API to initiate the download of video content from remote servers,
-as well as managing the local content available in the VDS.
+as well as managing the local content available in LEAP.
 
-The `VDS` functionality can run in low power devices such as raspberry pi and similar SBCs, and is
+The `LEAP` functionality can run in low power devices such as raspberry pi and similar SBCs, and is
 tailored such that it uses minimal resources during runtime.
 
 ## Getting started
@@ -22,26 +22,26 @@ tailored such that it uses minimal resources during runtime.
 Clone the repository with:
 
 ```sh
-git clone --recurse-submodules git@github.com:T4EQ/vds.git
+git clone --recurse-submodules git@github.com:T4EQ/leap.git
 ```
 
-This will create a `vds` directory inside your current working directory.
+This will create a `leap` directory inside your current working directory.
 The layout of this directory is as follows:
 
 ```
 .
 ├── README.md           -> This file. Contains information about the project.
-├── vds-server          -> The main web server application crate, build using actix-web.
-├── vds-site            -> The frontend application crate, built using Yew. It is built as a wasm application and embedded into the vds-server binary.
+├── leap-server         -> The main web server application crate, build using actix-web.
+├── leap-site           -> The frontend application crate, built using Yew. It is built as a wasm application and embedded into the leap-server binary.
 │   ├── index.html      -> The entrypoint of the single-page web application. The body tag is populated from the Yew app.
 │   ├── index.scss      -> The sylesheet applicable to the whole frontend.
 │   └── ...             -> Other files belonging a regular Rust crate.
-├── vds-api             -> A library crate containing data types that may be shared between frontend and backend.
+├── leap-api            -> A library crate containing data types that may be shared between frontend and backend.
 ├── xtask               -> A binary crate that implements tasks to build and run the whole project.
 ├── flake.nix           -> Declares the dependencies of the project in order to perform reproducible builds. You can safely ignore this file.
 ├── flake.lock          -> Pins the dependencies of the repository. You can safely ignore this file.
 └── .cargo
-   └── config.toml     -> Configuration file defining cargo aliases.
+   └── config.toml      -> Configuration file defining cargo aliases.
 ```
 
 ### Dependencies
@@ -73,7 +73,7 @@ Note that `b` and `br` are cargo aliases defined in `.cargo/config.toml`. These 
 with the corresponding arguments to trigger a build. You can read more about the `xtask` pattern 
 [here](https://github.com/matklad/cargo-xtask).
 
-You will find the build under `target/{debug,release}/vds-server` depending on the build profile you used.
+You will find the build under `target/{debug,release}/leap-server` depending on the build profile you used.
 This is a self-contained binary that contains the frontend build inside itself.
 
 Alternatively, you can serve the web server locally on port `8080` using:
@@ -89,7 +89,7 @@ cargo rr
 Note that this command does not terminate, but keeps serving the website at `http://localhost:8080`. 
 
 For development, you might want to use [`cargo-watch`](https://crates.io/crates/cargo-watch) to watch 
-all file changes and automatically rebuild the `vds-server` (and `vds-site`) when they change, 
+all file changes and automatically rebuild the `leap-server` (and `leap-site`) when they change, 
 so that simply refreshing the web browser page displays the latest edits. 
 
 ```sh
@@ -102,13 +102,13 @@ As mentioned above, this setup is mainly intended for continuous integration/dep
 if you have the `Nix` package manager installed in your system, it will automatically ensure you 
 get the right tool versions out of the box. 
 
-You can build the `vds-server` with:
+You can build the `leap-server` with:
 
 ```sh
 nix build --extra-experimental-features 'nix-command flakes' .
 ```
 
-And find the result under the `result/bin/vds-server` path.
+And find the result under the `result/bin/leap-server` path.
 
 Or you can enter a development shell with the full environment preconfigured and run the build steps 
 listed in [Build with Cargo](#build-with-cargo), using:
@@ -127,10 +127,10 @@ file every time you run cargo.
 ### Build with Nix for the target
 
 ```sh
-nix build --extra-experimental-features 'nix-command flakes' .#vds-target
+nix build --extra-experimental-features 'nix-command flakes' .#leap-target
 ```
 
-A static binary will be present under the `result/bin/vds-server` path, compiled for the aarch64 architecture.
+A static binary will be present under the `result/bin/leap-server` path, compiled for the aarch64 architecture.
 
 Note that this build can be particularly slow if you are building on an x64 computer, because it is 
 cross compiling to aarch64 and running aarch64 binaries. In order to run aarch64 binaries, you might 

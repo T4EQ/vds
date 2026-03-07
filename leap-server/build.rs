@@ -7,10 +7,10 @@ fn main() -> std::io::Result<()> {
     // Record build-time information
     built::write_built_file()?;
 
-    let frontend_path = std::env::var("VDS_SERVER_FRONTEND_PATH")
-        .unwrap_or_else(|_| "../vds-site/dist".to_string());
+    let frontend_path = std::env::var("LEAP_SERVER_FRONTEND_PATH")
+        .unwrap_or_else(|_| "../leap-site/dist".to_string());
 
-    // The VDS site code is embedded so that we only need to run a single binary
+    // The LEAP site code is embedded so that we only need to run a single binary
     // without additional dependencies.
     println!("cargo::rerun-if-changed={frontend_path}");
     resource_dir(&frontend_path).build()
