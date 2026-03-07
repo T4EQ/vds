@@ -2,7 +2,7 @@
 name = "leap-site"
 version = "0.1.0"
 edition = "2024"
-description = "Video delivery system frontend site"
+description = "Low-bandwidth Educational Access Platform frontend site"
 license = "MIT OR Apache-2.0"
 authors = ["Javier Alvarez <javier.alvarez@allthingsembedded.net>", "Johannes Frohnhofen <johannes@frohnhofen.com>", "Sivaranjini Chithambaram <sichitha@microsoft.com>"]
 homepage = "https://github.com/t4eq/leap"
