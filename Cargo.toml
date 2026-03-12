@@ -46,5 +46,5 @@ wasm-bindgen-futures = "0.4"
 wasm-logger = "0.2"
 web-sys = "0.3"
 xshell = "0.2.7"
-yew = { version = "0.22", features = ["csr"] }
+yew = { version = "=0.22.0", features = ["csr"] }
 yew-router = "0.19"
