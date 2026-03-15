@@ -1,10 +1,15 @@
 mod backend;
+mod s3backend;
 mod tasks;
 
 use std::{path::PathBuf, sync::Arc};
 
-use crate::{cfg::DownloaderConfig, db::Database};
+use crate::{
+    cfg::{DownloaderConfig, S3Config},
+    db::Database,
+};
 use backend::FileBackend;
+use s3backend::S3Backend;
 
 use tokio::sync::mpsc::UnboundedReceiver;
 
@@ -98,6 +103,7 @@ async fn check_updates(
 #[tracing::instrument(name = "run_downloader", skip(config, db, cmd_receiver))]
 pub async fn run_downloader(
     config: DownloaderConfig,
+    s3_config: S3Config,
     db: Arc<Database>,
     mut cmd_receiver: UnboundedReceiver<UserCommand>,
 ) -> anyhow::Result<()> {
@@ -113,8 +119,13 @@ pub async fn run_downloader(
             Arc::new(FileBackend::new(&path))
         }
         Some("s3") => {
-            // We will hook up the S3Backend here, once available.
-            unimplemented!()
+            let bucket = config
+                .remote_server
+                .host()
+                .ok_or_else(|| anyhow::anyhow!("S3 URI must specify a bucket name"))?;
+            tracing::info!("Using S3 backend with bucket: {bucket}");
+
+            Arc::new(S3Backend::new(bucket, &s3_config).await?)
         }
         Some(scheme) => {
             anyhow::bail!("Unknown remote server URI scheme: {scheme}");
