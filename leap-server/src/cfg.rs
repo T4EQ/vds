@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use config::Config;
 use http::Uri;
+use secrecy::SecretString;
 
 fn default_listen_addr() -> String {
     "127.0.0.1".to_string()
@@ -14,6 +15,10 @@ fn default_listen_port() -> u16 {
 
 fn default_path_style() -> bool {
     false
+}
+
+fn default_aws_region() -> String {
+    "us-east-1".to_string()
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
@@ -96,32 +101,46 @@ impl DbConfig {
     }
 }
 
+/// Configuration to access the S3 server. Note the bucket is handled separately in the main
+/// configuration.
 #[derive(serde::Deserialize, Debug, Clone)]
-pub struct AwsConfig {
+pub struct S3Config {
+    /// S3 Endpoint URL. Defaults to AWS if not given.
     pub endpoint_url: Option<String>,
+
+    /// Uses path-style access to buckets instead of dns-based access. Use this if your endpoint is
+    /// not AWS and you are unable to connect to your bucket (MinIO, Ceph, etc).
     #[serde(default = "default_path_style")]
     pub force_path_style: bool,
-    pub access_key_id: String,
-    pub secret_access_key: String,
+
+    /// Access key ID.
+    pub access_key_id: Option<SecretString>,
+
+    /// Secret Access key.
+    pub secret_access_key: Option<SecretString>,
+
+    /// AWS region. Defaults to `us-east-1`.
+    #[serde(default = "default_aws_region")]
     pub region: String,
 }
 
+/// Configuration of the LEAP application.
 #[derive(serde::Deserialize, Debug, Clone)]
 pub struct LeapConfig {
     /// Enables debug logging/tracing.
     pub debug: bool,
 
-    /// HTTP Server configuration
+    /// HTTP Server configuration.
     pub http_config: HttpServerConfig,
 
-    /// Downloader service configuration
+    /// Downloader service configuration.
     pub downloader_config: DownloaderConfig,
 
-    /// Database configuration
+    /// Database configuration.
     pub db_config: DbConfig,
 
-    /// AWS configuration (optional)
-    pub aws_config: Option<AwsConfig>,
+    /// S3 configuration.
+    pub s3_config: S3Config,
 }
 
 /// Parses the configuration of the LEAP, returning a LeapConfig struct.

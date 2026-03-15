@@ -1,11 +1,21 @@
 use std::pin::Pin;
 
+use crate::cfg::S3Config;
 use crate::downloader::Error;
-use crate::downloader::backend::{Backend, ChunkResult}; // Change this line
+use crate::downloader::backend::{Backend, ChunkResult};
 
 use async_stream::stream;
 use aws_sdk_s3::Client;
+use secrecy::{ExposeSecret, SecretString};
 use tokio_stream::Stream;
+
+#[derive(Debug, Clone)]
+struct ResolvedS3Config {
+    pub endpoint_url: Option<(String, bool)>,
+    pub access_key_id: SecretString,
+    pub secret_access_key: SecretString,
+    pub region: String,
+}
 
 pub struct S3Backend {
     client: Client,
@@ -13,62 +23,70 @@ pub struct S3Backend {
 }
 
 impl S3Backend {
-    pub async fn new(
-        bucket: &str,
-        aws_config: Option<&crate::cfg::AwsConfig>,
-    ) -> anyhow::Result<Self> {
+    fn resolve_s3_config(s3_config: &S3Config) -> anyhow::Result<ResolvedS3Config> {
+        let endpoint_url = std::env::var("AWS_ENDPOINT_URL")
+            .ok()
+            .or(s3_config.endpoint_url.clone())
+            .map(|e| (e, s3_config.force_path_style));
+
+        let access_key_id = std::env::var("AWS_ACCESS_KEY_ID")
+            .ok()
+            .map(SecretString::from)
+            .or(s3_config.access_key_id.clone())
+            .ok_or(anyhow::anyhow!(concat!(
+                "No AWS access key ID provided. ",
+                "Please set either the AWS_ACCESS_KEY_ID environment variable or use ",
+                "the LEAP configuration file to define the access_key_id"
+            )))?;
+
+        let secret_access_key = std::env::var("AWS_SECRET_ACCESS_KEY")
+            .ok()
+            .map(SecretString::from)
+            .or(s3_config.secret_access_key.clone())
+            .ok_or(anyhow::anyhow!(concat!(
+                "No AWS secret access key provided. ",
+                "Please set either the AWS_SECRET_ACCESS_KEY environment variable or use ",
+                "the LEAP configuration file to define the secret_access_key"
+            )))?;
+
+        let region = std::env::var("AWS_REGION")
+            .ok()
+            .unwrap_or(s3_config.region.clone());
+
+        Ok(ResolvedS3Config {
+            endpoint_url,
+            access_key_id,
+            secret_access_key,
+            region,
+        })
+    }
+
+    pub async fn new(bucket: &str, s3_config: &crate::cfg::S3Config) -> anyhow::Result<Self> {
         tracing::info!("Initializing S3 backend for bucket: {}", bucket);
-
-        let (endpoint_url, access_key, secret_key, region) = if let Some(cfg) = aws_config {
-            tracing::debug!("✓ Using AWS credentials from config file");
-            tracing::debug!("✓ Endpoint URL: {:?}", cfg.endpoint_url);
-            tracing::debug!("✓ AWS Region: {}", cfg.region);
-            (
-                cfg.endpoint_url.clone(),
-                cfg.access_key_id.clone(),
-                cfg.secret_access_key.clone(),
-                cfg.region.clone(),
-            )
-        } else {
-            // Fall back to environment variables
-            let endpoint_url = std::env::var("AWS_ENDPOINT_URL").ok();
-            let access_key = std::env::var("AWS_ACCESS_KEY_ID").map_err(|_| {
-                anyhow::anyhow!("AWS_ACCESS_KEY_ID not set in environment or config")
-            })?;
-            let secret_key = std::env::var("AWS_SECRET_ACCESS_KEY").map_err(|_| {
-                anyhow::anyhow!("AWS_SECRET_ACCESS_KEY not set in environment or config")
-            })?;
-            let region = std::env::var("AWS_REGION")
-                .or_else(|_| std::env::var("AWS_DEFAULT_REGION"))
-                .map_err(|_| anyhow::anyhow!("AWS_REGION not set in environment or config"))?;
-
-            tracing::debug!("✓ Using AWS credentials from environment variables");
-            tracing::debug!("✓ Endpoint URL: {:?}", endpoint_url);
-            tracing::debug!("✓ AWS Region: {}", region);
-            (endpoint_url, access_key, secret_key, region)
-        };
+        let s3_config = Self::resolve_s3_config(s3_config)?;
+        tracing::debug!("✓ Using S3 configuration: {s3_config:?}");
 
         // Build AWS config with explicit credentials
-        let creds =
-            aws_sdk_s3::config::Credentials::new(access_key, secret_key, None, None, "config-file");
+        let creds = aws_sdk_s3::config::Credentials::new(
+            s3_config.access_key_id.expose_secret(),
+            s3_config.secret_access_key.expose_secret(),
+            None,
+            None,
+            "config-file",
+        );
 
         let retry_config = aws_config::retry::RetryConfig::standard().with_max_attempts(3);
 
         let config_loader = aws_sdk_s3::Config::builder()
             .behavior_version_latest()
             .credentials_provider(creds)
-            .region(aws_sdk_s3::config::Region::new(region))
+            .region(aws_sdk_s3::config::Region::new(s3_config.region))
             .retry_config(retry_config);
 
-        let config = if let Some(endpoint_url) = endpoint_url {
+        let config = if let Some((endpoint_url, force_path_style)) = s3_config.endpoint_url {
             config_loader
                 .endpoint_url(endpoint_url)
-                .force_path_style(
-                    aws_config
-                        .as_ref()
-                        .map(|c| c.force_path_style)
-                        .unwrap_or(true),
-                )
+                .force_path_style(force_path_style)
                 .build()
         } else {
             config_loader.build()
@@ -109,16 +127,18 @@ impl S3Backend {
             .await
             .map_err(|e| {
                 tracing::error!(
-                    "Failed to get S3 object s3://{}/{}: {}",
+                    concat!(
+                        "Failed to get S3 object s3://{}/{}: {}\n",
+                        "Possible reasons:\n",
+                        "  - File does not exist in S3\n",
+                        "  - Missing s3:GetObject permission\n",
+                        "  - Invalid AWS credentials\n",
+                        "  - Network connectivity issue\n",
+                    ),
                     self.bucket,
                     key,
                     e
                 );
-                tracing::error!("Possible reasons:");
-                tracing::error!("  - File does not exist in S3");
-                tracing::error!("  - Missing s3:GetObject permission");
-                tracing::error!("  - Invalid AWS credentials");
-                tracing::error!("  - Network connectivity issue");
                 Error::IoError(std::io::Error::other(format!(
                     "Failed to get S3 object s3://{}/{}: {}",
                     self.bucket, key, e
@@ -180,10 +200,10 @@ impl Backend for S3Backend {
 
         let data = result.body.collect().await.map_err(|e| {
             tracing::error!("Failed to read manifest body: {}", e);
-            Error::IoError(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to read manifest body: {}", e),
-            ))
+            Error::IoError(std::io::Error::other(format!(
+                "Failed to read manifest body: {}",
+                e
+            )))
         })?;
 
         tracing::info!("Successfully fetched manifest from S3");
