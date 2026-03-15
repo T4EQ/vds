@@ -94,23 +94,42 @@ impl S3Backend {
 
         let client = Client::from_conf(config);
 
-        // Verify bucket access
-        client
-            .head_bucket()
-            .bucket(bucket)
-            .send()
-            .await
-            .map_err(|e| {
-                tracing::error!("✗ Failed to verify S3 bucket access: {}", e);
-                anyhow::anyhow!("Cannot access S3 bucket '{}': {}", bucket, e)
-            })?;
-
-        tracing::info!("✓ Successfully verified access to S3 bucket: {}", bucket);
+        // Note that at this point we do not validate the credentials because that was supposed to
+        // be done during provisioning. Once the system is provisioned, we assume that the
+        // credentials are correct, because validating them here might imply failing due to
+        // spurious network errors (to which we need to be resilient due to the nature of the
+        // environment where the project will run).
 
         Ok(Self {
             client,
             bucket: bucket.to_string(),
         })
+    }
+
+    /// Checks that we can access the bucket using the given credentials. This might be used, for
+    /// instance, to check that we have access to the bucket after the user has provisioned the
+    /// system with the given credentials.
+    #[expect(
+        dead_code,
+        reason = "This method will be used for provisioning, but currently it is unused."
+    )]
+    pub async fn verify_bucket_access(&self) -> anyhow::Result<()> {
+        // Verify bucket access
+        self.client
+            .head_bucket()
+            .bucket(&self.bucket)
+            .send()
+            .await
+            .map_err(|e| {
+                tracing::error!("✗ Failed to verify S3 bucket access: {}", e);
+                anyhow::anyhow!("Cannot access S3 bucket '{}': {}", self.bucket, e)
+            })?;
+
+        tracing::info!(
+            "✓ Successfully verified access to S3 bucket: {}",
+            self.bucket
+        );
+        Ok(())
     }
 
     async fn get_s3_object(
