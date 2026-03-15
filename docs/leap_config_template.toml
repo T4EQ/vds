@@ -20,9 +20,9 @@ max_backoff = "2 hours"
 listen_address = "127.0.0.1"
 listen_port = 8080
 
+[s3_config]
 access_key_id = "your-access-key-id"
 secret_access_key = "your-secret-access-key"
 endpoint_url = "https://your-endpoint-url.com"
-[s3_config]
 force_path_style = true # Use with non-aws endpoints
 region = "us-east-1"
