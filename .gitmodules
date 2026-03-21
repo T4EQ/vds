@@ -1,0 +1,3 @@
+[submodule "leap-linux/buildroot"]
+	path = leap-linux/buildroot
+	url = https://gitlab.com/buildroot.org/buildroot.git
