@@ -1,0 +1,5 @@
+menu "LEAP Packages"
+
+source "$BR2_EXTERNAL_LEAP_PATH/package/leap/Config.in"
+
+endmenu
