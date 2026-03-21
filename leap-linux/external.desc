@@ -1,0 +1,3 @@
+name: LEAP
+desc: LEAP is a raspberry-pi based system that serves local video content managed from an
+external S3 server via a manifest file.
