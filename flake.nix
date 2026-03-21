@@ -49,11 +49,11 @@
               lockFile = ./Cargo.lock;
             };
 
-            nativeBuildInputs = [
-              pkgs.trunk
-              pkgs.wasm-bindgen-cli_0_2_106
-              pkgs.dart-sass
-              pkgs.lld
+            nativeBuildInputs = with pkgs; [
+              trunk
+              wasm-bindgen-cli_0_2_106
+              dart-sass
+              lld
             ];
 
             buildPhase = "
@@ -83,8 +83,8 @@
             lockFile = ./Cargo.lock;
           };
 
-          nativeBuildInputs = [
-            pkgs.lld
+          nativeBuildInputs = with pkgs; [
+            lld
           ];
 
           buildPhase = "
@@ -138,17 +138,58 @@
         in
         rec {
           leap = pkgs.mkShell {
-            nativeBuildInputs = [
-              (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
-              pkgs.trunk
-              pkgs.wasm-bindgen-cli_0_2_106
-              pkgs.dart-sass
-              pkgs.cargo-watch
-              pkgs.cargo-deny
-              pkgs.diesel-cli
-              pkgs.bunyan-rs
+            nativeBuildInputs = with pkgs; [
+              (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
+              trunk
+              wasm-bindgen-cli_0_2_106
+              dart-sass
+              cargo-watch
+              cargo-deny
+              diesel-cli
+              bunyan-rs
             ];
           };
+
+          leap-linux = (pkgs.buildFHSEnv {
+            pname = "leap-linux";
+            version = "1.0.0";
+
+            targetPkgs = pkgs: with pkgs; [
+              which
+              gnused
+              gnumake
+              binutils
+              diffutils
+              gcc
+              bash
+              patch
+              gzip
+              bzip2
+              perl
+              gnutar
+              cpio
+              unzip
+              rsync
+              file
+              bc
+              findutils
+              gawk
+
+              wget
+
+              # Additional host deps
+              ncurses
+              ncurses.dev
+              pkg-config
+              libxcrypt
+              openssl
+              openssl.dev
+              gnutls
+              gnutls.dev
+              expat
+              expat.dev
+            ];
+          }).env;
 
           default = leap;
         }
