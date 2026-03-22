@@ -34,7 +34,7 @@ top@{ inputs, ... }:
         };
 
       targetPkgs = import inputs.nixpkgs {
-        inherit (pkgs) system;
+        inherit (pkgs.stdenv.hostPlatform) system;
         crossSystem = {
           isStatic = true;
           config = "aarch64-unknown-linux-musl";

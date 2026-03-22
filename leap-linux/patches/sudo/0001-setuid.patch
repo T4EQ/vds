@@ -1,0 +1,11 @@
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -277,7 +277,7 @@
+ 	fi
+
+ install-binaries: install-dirs $(PROGS)
+-	INSTALL_BACKUP='$(INSTALL_BACKUP)' $(LIBTOOL) $(LTFLAGS) --mode=install $(INSTALL) $(INSTALL_OWNER) -m 04755 sudo $(DESTDIR)$(bindir)/sudo
++	INSTALL_BACKUP='$(INSTALL_BACKUP)' $(LIBTOOL) $(LTFLAGS) --mode=install $(INSTALL) $(INSTALL_OWNER) -m 0755 sudo $(DESTDIR)$(bindir)/sudo
+ 	rm -f $(DESTDIR)$(bindir)/sudoedit
+ 	ln -s sudo $(DESTDIR)$(bindir)/sudoedit
+ 	if [ -f sesh ]; then \

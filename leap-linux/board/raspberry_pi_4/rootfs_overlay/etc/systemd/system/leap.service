@@ -1,0 +1,8 @@
+[Unit]
+Description=leap
+
+[Service]
+ExecStart=/usr/bin/leap-server
+
+[Install]
+WantedBy=multi-user.target

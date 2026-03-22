@@ -8,6 +8,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     flake-parts.url = "github:hercules-ci/flake-parts";
+    buildroot-nix.url = "github:velentr/buildroot.nix/master";
   };
 
   outputs =
@@ -38,20 +39,20 @@
           git-rev = "${self.rev or self.dirtyRev or "Unknown"}";
 
           perSystem =
-            { config, ... }:
+            { config,pkgs, ... }:
             {
               packages.default = config.packages.leap;
 
               devShells = rec {
                 leap =
                   let
-                    pkgs = import inputs.nixpkgs {
-                      inherit (pkgs) system;
+                    pkgsWithRustOverlay = import inputs.nixpkgs {
+                      inherit (pkgs.stdenv.hostPlatform) system;
                       overlays = [ inputs.rust-overlay.overlays.default ];
                     };
                   in
-                  pkgs.mkShell {
-                    nativeBuildInputs = with pkgs; [
+                  pkgsWithRustOverlay.mkShell {
+                    nativeBuildInputs = with pkgsWithRustOverlay; [
                       (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
                       trunk
                       wasm-bindgen-cli_0_2_106

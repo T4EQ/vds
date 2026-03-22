@@ -19,3 +19,6 @@ menuconfig:
 
 savedefconfig:
 	make -C $(BUILDROOT_PATH) BR2_EXTERNAL=$(PWD) O=$(OUT_DIR) BR2_DEFCONFIG=$(DEFCONFIG_PATH) savedefconfig
+
+show-info:
+	make -C $(BUILDROOT_PATH) BR2_EXTERNAL=$(PWD) O=$(OUT_DIR) show-info
