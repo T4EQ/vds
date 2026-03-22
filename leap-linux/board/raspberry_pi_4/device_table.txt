@@ -14,3 +14,4 @@
 /etc/ssh/ssh_host_rsa_key.pub		f	644	0	0	-	-	-	-	-
 /etc/NetworkManager/system-connections/leap-hotspot.nmconnection		f	600	0	0	-	-	-	-	-
 /var/lib/leap		d	755	0	0	-	-	-	-	-
+/usr/libexec/ssh-keysign f 04755 0 0 - - - - -

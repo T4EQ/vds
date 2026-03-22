@@ -1,8 +1,5 @@
 config BR2_PACKAGE_LEAP
     bool "Enable LEAP packaging"
-    depends on BR2_PACKAGE_HOST_RUSTC_TARGET_ARCH_SUPPORTS
-    select BR2_PACKAGE_HOST_RUSTC
-    select BR2_PACKAGE_HOST_LEAP_SITE
     help
 	  Packages and enables the LEAP application to run as a systemd
 	  service.
