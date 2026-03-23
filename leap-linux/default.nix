@@ -71,10 +71,11 @@ in
             defconfig = "leap_defconfig";
             lockfile = ./buildroot.lock;
 
-            src = pkgs.fetchgit {
-              url = "https://gitlab.com/buildroot.org/buildroot";
-              branchName = "2026.02";
-              sha256 = "sha256-XKDo55apHycjsMNUCAYKBqWx6emDNGKU3kJcYUcywh0=";
+            src = pkgs.fetchFromGitLab {
+              owner = "buildroot.org";
+              repo = "buildroot";
+              rev = "2026.02";
+              hash = "sha256-rzi1p2xi4k33b6mMJB/DDhaTQmUnHAzkx9qRYHKuGVI=";
             };
 
             externalSrc = leapBuildrootSrc;
