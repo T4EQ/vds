@@ -89,8 +89,15 @@ in
             # Buildroot's openssh.mk installs ssh-keysign directly with mode 4711
             # (setuid), bypassing Makefile.in. Patch the .mk file so the Nix
             # sandbox (which blocks SUID chmod) doesn't fail.
+            #
+            # sudo's configure probes /run, /var/run, etc. to pick a rundir.
+            # On NixOS those dirs appear in the sandbox (via sandbox-paths), but
+            # on plain Linux (GitHub Actions) they don't, so _PATH_SUDO_LOGSRVD_PID
+            # never gets defined and logsrvd fails to compile. Provide an explicit
+            # rundir so the probe is skipped entirely.
             patchPhase = old.patchPhase + ''
               sed -i 's/-m 4711/-m 0711/' package/openssh/openssh.mk
+              sed -i '/^\$(eval \$(autotools-package))/i SUDO_CONF_OPTS += --with-rundir=/run/sudo' package/sudo/sudo.mk
             '';
           });
         };
