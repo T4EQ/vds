@@ -18,9 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Disable app armor. Causes problems with bwrap and Nix.
-      run:
+      run: |
         sudo aa-teardown || true
-        sudo systemctl disable --now apparmor.service
+        sudo systemctl disable --now apparmor.service || true
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v31
       with:
