@@ -3,6 +3,9 @@ Description=leap
 
 [Service]
 ExecStart=/usr/bin/leap-server
+Type=exec
+Restart=always
+RestartSec=1
 
 [Install]
 WantedBy=multi-user.target
