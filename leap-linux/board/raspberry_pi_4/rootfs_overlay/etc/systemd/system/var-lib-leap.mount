@@ -1,0 +1,9 @@
+[Unit]
+Description=LEAP storage mount
+
+[Mount]
+What=LABEL=LEAP_DATA
+Where=/var/lib/leap
+Type=ext4
+Options=rw,noatime
+TimeoutSec=90
