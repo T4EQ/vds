@@ -1,0 +1,2 @@
+# Allow sudo users to become root without passwd
+ %wheel ALL=(ALL:ALL) NOPASSWD: ALL

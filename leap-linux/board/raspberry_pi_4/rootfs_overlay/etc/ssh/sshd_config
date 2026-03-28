@@ -15,9 +15,9 @@
 #ListenAddress 0.0.0.0
 #ListenAddress ::
 
-#HostKey /etc/ssh/ssh_host_rsa_key
-#HostKey /etc/ssh/ssh_host_ecdsa_key
-#HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
 
 # Ciphers and keying
 #RekeyLimit default none
@@ -54,8 +54,9 @@ AuthorizedKeysFile	.ssh/authorized_keys
 #IgnoreRhosts yes
 
 # To disable tunneled clear text passwords, change to no here!
-PasswordAuthentication yes
-#PermitEmptyPasswords no
+PasswordAuthentication no
+PermitEmptyPasswords no
+TrustedUserCAKeys /etc/ssh/trusted_user_ca_keys
 
 # Change to no to disable s/key passwords
 #KbdInteractiveAuthentication yes
