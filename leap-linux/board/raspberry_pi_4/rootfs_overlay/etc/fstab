@@ -1,2 +1,0 @@
-/dev/root / auto ro 0 1
-LABEL=LEAP_DATA /var/lib/leap ext4 defaults,noatime,nofail 0 2
