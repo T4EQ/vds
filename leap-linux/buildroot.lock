@@ -26,15 +26,6 @@
       "https://sources.buildroot.net/XML-Parser-2.47.tar.gz"
     ]
   },
-  "aarch64--glibc--stable-2025.08-1.tar.xz": {
-    "algo": "sha256",
-    "checksum": "dfb47eee874eef9e8a7fc042eee4e0a183f444b6bcde6a82fef8f009918389c9",
-    "uris": [
-      "https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--glibc--stable-2025.08-1.tar.xz",
-      "https://sources.buildroot.net/toolchain-external-bootlin/aarch64--glibc--stable-2025.08-1.tar.xz",
-      "https://sources.buildroot.net/aarch64--glibc--stable-2025.08-1.tar.xz"
-    ]
-  },
   "acl-2.3.2.tar.xz": {
     "algo": "sha256",
     "checksum": "97203a72cae99ab89a067fe2210c1cbf052bc492b479eca7d226d9830883b0bd",
@@ -87,6 +78,15 @@
       "https://ftpmirror.gnu.org/bash/bash-5.2.37.tar.gz",
       "https://sources.buildroot.net/bash/bash-5.2.37.tar.gz",
       "https://sources.buildroot.net/bash-5.2.37.tar.gz"
+    ]
+  },
+  "binutils-2.44.tar.xz": {
+    "algo": "sha512",
+    "checksum": "b85d3bbc0e334cf67a96219d3c7c65fbf3e832b2c98a7417bf131f3645a0307057ec81cd2b29ff2563cec53e3d42f73e2c60cc5708e80d4a730efdcc6ae14ad7",
+    "uris": [
+      "https://ftpmirror.gnu.org/binutils/binutils-2.44.tar.xz",
+      "https://sources.buildroot.net/binutils/binutils-2.44.tar.xz",
+      "https://sources.buildroot.net/binutils-2.44.tar.xz"
     ]
   },
   "bison-3.8.2.tar.xz": {
@@ -242,6 +242,15 @@
       "https://sources.buildroot.net/gawk-5.3.2.tar.xz"
     ]
   },
+  "gcc-14.3.0.tar.xz": {
+    "algo": "sha512",
+    "checksum": "cb4e3259640721bbd275c723fe4df53d12f9b1673afb3db274c22c6aa457865dccf2d6ea20b4fd4c591f6152e6d4b87516c402015900f06ce9d43af66d3b7a93",
+    "uris": [
+      "https://ftpmirror.gnu.org/gcc/gcc-14.3.0/gcc-14.3.0.tar.xz",
+      "https://sources.buildroot.net/gcc/gcc-14.3.0.tar.xz",
+      "https://sources.buildroot.net/gcc-14.3.0.tar.xz"
+    ]
+  },
   "genimage-19.tar.xz": {
     "algo": "sha256",
     "checksum": "7ec4fcb865662a8b2ff20284819044ffa84137bf3ca16fb749701291bc01f108",
@@ -293,6 +302,15 @@
       "https://ftpmirror.gnu.org/gmp/gmp-6.3.0.tar.xz",
       "https://sources.buildroot.net/gmp/gmp-6.3.0.tar.xz",
       "https://sources.buildroot.net/gmp-6.3.0.tar.xz"
+    ]
+  },
+  "gnutls-3.8.12.tar.xz": {
+    "algo": "sha256",
+    "checksum": "a7b341421bfd459acf7a374ca4af3b9e06608dcd7bd792b2bf470bea012b8e51",
+    "uris": [
+      "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.12.tar.xz",
+      "https://sources.buildroot.net/gnutls/gnutls-3.8.12.tar.xz",
+      "https://sources.buildroot.net/gnutls-3.8.12.tar.xz"
     ]
   },
   "gperf-3.3.tar.gz": {
@@ -403,6 +421,15 @@
       "https://sources.buildroot.net/libnl-3.11.0.tar.gz"
     ]
   },
+  "libtasn1-4.21.0.tar.gz": {
+    "algo": "sha256",
+    "checksum": "1d8a444a223cc5464240777346e125de51d8e6abf0b8bac742ac84609167dc87",
+    "uris": [
+      "https://ftpmirror.gnu.org/libtasn1/libtasn1-4.21.0.tar.gz",
+      "https://sources.buildroot.net/libtasn1/libtasn1-4.21.0.tar.gz",
+      "https://sources.buildroot.net/libtasn1-4.21.0.tar.gz"
+    ]
+  },
   "libtool-2.4.6.tar.xz": {
     "algo": "sha256",
     "checksum": "7c87a8c2c8c0fc9cd5019e402bed4292462d00a718a7cd5f11218153bf28b26f",
@@ -410,6 +437,15 @@
       "https://ftpmirror.gnu.org/libtool/libtool-2.4.6.tar.xz",
       "https://sources.buildroot.net/libtool/libtool-2.4.6.tar.xz",
       "https://sources.buildroot.net/libtool-2.4.6.tar.xz"
+    ]
+  },
+  "libunistring-1.4.2.tar.xz": {
+    "algo": "sha256",
+    "checksum": "5b46e74377ed7409c5b75e7a96f95377b095623b689d8522620927964a41499c",
+    "uris": [
+      "https://ftpmirror.gnu.org/libunistring/libunistring-1.4.2.tar.xz",
+      "https://sources.buildroot.net/libunistring/libunistring-1.4.2.tar.xz",
+      "https://sources.buildroot.net/libunistring-1.4.2.tar.xz"
     ]
   },
   "libxcrypt-4.5.2.tar.xz": {
@@ -448,6 +484,15 @@
       "https://sources.buildroot.net/linux-21b410140c47ffab5668399f6f143c7d7b935c8b.tar.gz"
     ]
   },
+  "linux-6.12.74.tar.xz": {
+    "algo": "sha256",
+    "checksum": "3b56eeb1dc9a437f189ca56b823be3769994f59a4ea0895b08ec0d20acaca13e",
+    "uris": [
+      "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.74.tar.xz",
+      "https://sources.buildroot.net/linux/linux-6.12.74.tar.xz",
+      "https://sources.buildroot.net/linux-6.12.74.tar.xz"
+    ]
+  },
   "lzip-1.25.tar.gz": {
     "algo": "sha256",
     "checksum": "09418a6d8fb83f5113f5bd856e09703df5d37bae0308c668d0f346e3d3f0a56f",
@@ -482,6 +527,24 @@
       "https://github.com/mesonbuild/meson/releases/download/1.10.1/meson-1.10.1.tar.gz",
       "https://sources.buildroot.net/meson/meson-1.10.1.tar.gz",
       "https://sources.buildroot.net/meson-1.10.1.tar.gz"
+    ]
+  },
+  "mpc-1.3.1.tar.gz": {
+    "algo": "sha256",
+    "checksum": "ab642492f5cf882b74aa0cb730cd410a81edcdbec895183ce930e706c1c759b8",
+    "uris": [
+      "https://ftpmirror.gnu.org/mpc/mpc-1.3.1.tar.gz",
+      "https://sources.buildroot.net/mpc/mpc-1.3.1.tar.gz",
+      "https://sources.buildroot.net/mpc-1.3.1.tar.gz"
+    ]
+  },
+  "mpfr-4.1.1.tar.xz": {
+    "algo": "sha256",
+    "checksum": "ffd195bd567dbaffc3b98b23fd00aad0537680c9896171e44fe3ff79e28ac33d",
+    "uris": [
+      "http://www.mpfr.org/mpfr-4.1.1/mpfr-4.1.1.tar.xz",
+      "https://sources.buildroot.net/mpfr/mpfr-4.1.1.tar.xz",
+      "https://sources.buildroot.net/mpfr-4.1.1.tar.xz"
     ]
   },
   "mtools-4.0.48.tar.lz": {
