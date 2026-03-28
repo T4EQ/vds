@@ -1,1 +1,1 @@
-t4eq -1 t4eq -1 =t4eq /home/t4eq /bin/bash wheel,sudo T4EQ user
+t4eq -1 t4eq -1 - /home/t4eq /bin/bash wheel,sudo T4EQ user
