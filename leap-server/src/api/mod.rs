@@ -48,5 +48,9 @@ pub fn register_handlers(app: &mut web::ServiceConfig) {
 
 pub fn register_provisioning_handlers(app: &mut web::ServiceConfig) {
     app.service(common_api_handlers());
-    app.service(web::scope("provision").service(provision::set_network_config));
+    app.service(
+        web::scope("provision")
+            .service(provision::set_network_config)
+            .service(provision::get_storage_devs),
+    );
 }
