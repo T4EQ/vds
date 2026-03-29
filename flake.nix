@@ -18,6 +18,7 @@
       {
         imports = [
           ./leap-site
+          ./leap-provision-site
           ./leap-server
           ./leap-linux
         ];

@@ -5,31 +5,12 @@ use config::Config;
 use http::Uri;
 use secrecy::SecretString;
 
-fn default_listen_addr() -> String {
-    "127.0.0.1".to_string()
-}
-
-fn default_listen_port() -> u16 {
-    8080
-}
-
 fn default_path_style() -> bool {
     false
 }
 
 fn default_aws_region() -> String {
     "us-east-1".to_string()
-}
-
-#[derive(serde::Deserialize, Debug, Clone)]
-pub struct HttpServerConfig {
-    /// Address/interface to listen for TCP connections.
-    #[serde(default = "default_listen_addr")]
-    pub listen_address: String,
-
-    /// Port to listen for TCP connections.
-    #[serde(default = "default_listen_port")]
-    pub listen_port: u16,
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
@@ -129,9 +110,6 @@ pub struct S3Config {
 pub struct LeapConfig {
     /// Enables debug logging/tracing.
     pub debug: bool,
-
-    /// HTTP Server configuration.
-    pub http_config: HttpServerConfig,
 
     /// Downloader service configuration.
     pub downloader_config: DownloaderConfig,

@@ -25,6 +25,7 @@ top@{ inputs, ... }:
             runHook preBuild
             pushd leap-server
             export LEAP_SERVER_FRONTEND_PATH=${config.packages.leap-site}/dist
+            export LEAP_SERVER_PROVISIONING_PATH=${config.packages.leap-provision-site}/dist
             export CARGO_TARGET_DIR=$(pwd)/../target
             export LEAP_SERVER_NIX_GIT_REVISION=${top.config.git-rev}
             cargo build --release --offline -j $NIX_BUILD_CORES --target ${targetPkgs.stdenv.hostPlatform.rust.rustcTarget} --no-default-features

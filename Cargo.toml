@@ -4,7 +4,8 @@ members = [
     "leap-site",
     "leap-server",
     "leap-api",
-    "xtask"
+    "leap-provision-site",
+    "xtask",
 ]
 
 [workspace.dependencies]

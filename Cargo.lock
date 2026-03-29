@@ -2514,6 +2514,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "leap-provision-site"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "gloo-net 0.2.6",
+ "leap-api",
+ "log",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-logger",
+ "web-sys",
+ "yew",
+ "yew-router",
+]
+
+[[package]]
 name = "leap-server"
 version = "0.1.0"
 dependencies = [
