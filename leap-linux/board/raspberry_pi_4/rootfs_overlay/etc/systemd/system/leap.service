@@ -3,7 +3,7 @@ Description=main leap service
 Wants=var-lib-leap.mount
 
 [Service]
-ExecStart=/usr/bin/leap-server
+ExecStart=/usr/bin/leap-server --fallback
 Type=exec
 Restart=always
 RestartSec=1
