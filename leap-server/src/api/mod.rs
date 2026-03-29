@@ -29,14 +29,13 @@ impl ApiData {
     }
 }
 
-fn register_common_handlers(app: &mut web::ServiceConfig) {
-    app.service(web::scope("api").service(user::get_version));
+fn common_api_handlers() -> actix_web::Scope {
+    web::scope("api").service(user::get_version)
 }
 
 pub fn register_handlers(app: &mut web::ServiceConfig) {
-    register_common_handlers(app);
     app.service(
-        web::scope("api")
+        common_api_handlers()
             .service(user::list_content_metadata)
             .service(user::content_metadata_for_id)
             .service(user::get_content)
@@ -48,6 +47,6 @@ pub fn register_handlers(app: &mut web::ServiceConfig) {
 }
 
 pub fn register_provisioning_handlers(app: &mut web::ServiceConfig) {
-    register_common_handlers(app);
+    app.service(common_api_handlers());
     app.service(web::scope("provision").service(provision::set_network_config));
 }
