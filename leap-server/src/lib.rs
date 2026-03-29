@@ -15,6 +15,7 @@ pub mod db;
 mod api;
 mod downloader;
 mod manifest;
+mod provision;
 mod static_files;
 
 pub async fn init_logging(logfile: Option<&Path>, debug: bool) {

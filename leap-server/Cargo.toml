@@ -30,6 +30,7 @@ http.workspace = true
 humantime-serde.workspace = true
 leap-api.path = "../leap-api"
 libsqlite3-sys.workspace = true
+nix.workspace = true
 regex.workspace = true
 secrecy.workspace = true
 serde.workspace = true

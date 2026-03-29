@@ -242,19 +242,23 @@ async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), Downloa
     let mut stream = ctx.backend.fetch_resource(&video.uri);
 
     let target_filepath = ctx.config.content_path.join(format!("{}.mp4", video.id));
+    if let Some(dir) = target_filepath.parent() {
+        tokio::fs::create_dir_all(dir).await.map_err(|e| {
+            tracing::error!("Error creating directory: {dir:?}. Error: {e}");
+            DownloadJobError::ShouldRetry(job.clone())
+        })?;
+    }
     let mut target_file = tokio::fs::File::create(&target_filepath)
         .await
         .map_err(|e| {
-            tracing::error!("Error creating file: {:?}. Error: {}", target_filepath, e);
+            tracing::error!("Error creating file: {target_filepath:?}. Error: {e}");
             DownloadJobError::ShouldRetry(job.clone())
         })?;
 
     let translate_error = |e: crate::db::Result<()>| {
         e.map_err(|e| {
             tracing::error!(
-                "Error setting download status for file: {:?}. Error: {}",
-                target_filepath,
-                e
+                "Error setting download status for file: {target_filepath:?}. Error: {e}",
             );
             DownloadJobError::Unrecoverable(job.clone())
         })
@@ -281,7 +285,7 @@ async fn download_job_task(ctx: DownloadContext, job: Job) -> Result<(), Downloa
 
         hasher.update(&chunk[..]);
         target_file.write_all(&chunk[..]).await.map_err(|e| {
-            tracing::error!("Error writing file: {:?}. Error: {}", target_filepath, e);
+            tracing::error!("Error writing file: {target_filepath:?}. Error: {e}");
             DownloadJobError::ShouldRetry(job.clone())
         })?;
         total_size += chunk.len();
