@@ -20,6 +20,15 @@ struct BuildArgs {
 struct RunArgs {
     #[command(flatten)]
     build_args: BuildArgs,
+
+    #[arg(short, long, default_value = "127.0.0.1")]
+    address: String,
+
+    #[arg(short, long, default_value = "8080")]
+    port: u16,
+
+    #[arg(long)]
+    provision: bool,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -50,6 +59,11 @@ fn build(args: &BuildArgs) -> anyhow::Result<()> {
         cmd!(shell, "trunk build {offline...} {release...}").run()?;
     }
 
+    {
+        let _dir = shell.push_dir("leap-provision-site");
+        cmd!(shell, "trunk build {offline...} {release...}").run()?;
+    }
+
     // Now build the backend
     cmd!(
         shell,
@@ -63,11 +77,15 @@ fn build(args: &BuildArgs) -> anyhow::Result<()> {
 fn run(args: &RunArgs) -> anyhow::Result<()> {
     build(&args.build_args)?;
 
+    let address = &args.address;
+    let port = format!("{}", args.port);
+
     let release = args.build_args.release.then_some("--release");
+    let provision = args.provision.then_some("--provision");
     let shell = xshell::Shell::new()?;
     cmd!(
         shell,
-        "cargo run {release...} --bin leap-server -- --config ./docs/leap_config_template.toml"
+        "cargo run {release...} --bin leap-server -- --config ./docs/leap_config_template.toml --address {address} --port {port} {provision...}"
     )
     .run()?;
 

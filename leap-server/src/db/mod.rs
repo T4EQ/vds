@@ -33,6 +33,8 @@ pub enum Error {
     MissingVideoInDb(uuid::Uuid),
     #[error("The video being deleted is still present in the manifest: {0}")]
     VideoIsStillInManifest(uuid::Uuid),
+    #[error("Filesystem error: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
@@ -53,8 +55,11 @@ impl Database {
     /// Opens the database using the given configuration. Returns an error if the
     /// database could not be opened. Also loads the manifest file from storage.
     pub async fn open(config: DbConfig) -> Result<Self> {
-        let url = config.db_path();
-        let url = url.to_string_lossy();
+        let db_path = config.db_path();
+        if let Some(dir) = db_path.parent() {
+            tokio::fs::create_dir_all(dir).await?;
+        }
+        let url = db_path.to_string_lossy();
         let manager = Manager::new(url, deadpool_diesel::Runtime::Tokio1);
         let pool: Pool<Manager<_>> = Pool::builder(manager)
             .max_size(config.pool_size)

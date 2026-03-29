@@ -15,6 +15,19 @@ mod downloader;
 mod manifest;
 mod static_files;
 
+pub async fn run_provisioning(listener: TcpListener) -> anyhow::Result<()> {
+    let server = HttpServer::new(move || {
+        App::new()
+            .wrap(tracing_actix_web::TracingLogger::default())
+            .configure(api::register_provisioning_handlers)
+            .configure(static_files::register_provisioning_files)
+    })
+    .listen(listener)?
+    .run();
+
+    Ok(server.await?)
+}
+
 pub async fn run_app(listener: TcpListener, config: LeapConfig) -> anyhow::Result<()> {
     let database = Arc::new(
         db::Database::open(config.db_config.clone())
@@ -44,7 +57,7 @@ pub async fn run_app(listener: TcpListener, config: LeapConfig) -> anyhow::Resul
             .app_data(api_data.clone())
             .wrap(tracing_actix_web::TracingLogger::default())
             .configure(api::register_handlers)
-            .configure(static_files::register_static_files)
+            .configure(static_files::register_site_files)
     })
     .listen(listener)?
     .run();
