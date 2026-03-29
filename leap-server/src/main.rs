@@ -1,8 +1,6 @@
-use std::{io::stdout, net::TcpListener, path::PathBuf};
+use std::{net::TcpListener, path::PathBuf};
 
 use clap::Parser;
-use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -70,35 +68,7 @@ async fn start_leap_server(args: &Args) -> Result<(), AppError> {
     let config =
         leap_server::cfg::get_config(args.config.as_ref().unwrap_or(&default_config_path()))
             .map_err(AppError::InvalidConfiguration)?;
-
-    let open_logfile = {
-        let logfile = config.db_config.logfile();
-        move || -> Box<dyn std::io::Write> {
-            Box::new(
-                std::fs::File::options()
-                    .create(true)
-                    .append(true)
-                    .open(&logfile)
-                    .map_err(|e| format!("Unable to open logfile {logfile:?}: {e}"))
-                    .unwrap(),
-            )
-        }
-    };
-
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                let level = if config.debug { "trace" } else { "info" };
-                tracing_subscriber::EnvFilter::new(level)
-            }),
-        )
-        .with(JsonStorageLayer)
-        .with(BunyanFormattingLayer::new("leap-server".into(), stdout))
-        .with(BunyanFormattingLayer::new(
-            "leap-server".into(),
-            open_logfile,
-        ))
-        .init();
+    leap_server::init_logging(Some(&config.db_config.logfile()), config.debug).await;
 
     let listener = TcpListener::bind(format!("{}:{}", args.address, args.port))
         .map_err(|e| AppError::RuntimeError(e.into()))?;
@@ -111,11 +81,12 @@ async fn start_leap_server(args: &Args) -> Result<(), AppError> {
     );
     leap_server::run_app(listener, config)
         .await
-        .map_err(|e| AppError::RuntimeError(e.into()))?;
+        .map_err(AppError::RuntimeError)?;
     Ok(())
 }
 
 async fn start_leap_provisioning(args: &Args) -> anyhow::Result<()> {
+    leap_server::init_logging(None, false).await;
     let listener = TcpListener::bind(format!("{}:{}", args.address, args.port))?;
     leap_server::run_provisioning(listener).await?;
     Ok(())
@@ -133,13 +104,16 @@ async fn main() -> anyhow::Result<()> {
         start_leap_provisioning(&args).await?;
     } else {
         match start_leap_server(&args).await {
-            res @ Err(AppError::InvalidConfiguration(_)) => {
+            Err(AppError::InvalidConfiguration(error)) => {
                 if args.provision_fallback {
+                    tracing::error!(
+                        "Failed to start leap with the given configuration file. Falling back to provisioning: {error}"
+                    );
                     start_leap_provisioning(&args).await?;
                 }
-                res
+                Err(AppError::InvalidConfiguration(error))
             }
-            res => res,
+            result => result,
         }?;
     }
 

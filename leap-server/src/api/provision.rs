@@ -7,6 +7,5 @@ use actix_web::{HttpResponse, Responder, post};
 )]
 #[post("network_config")]
 async fn set_network_config() -> impl Responder {
-    HttpResponse::Ok()
+    HttpResponse::Ok().await
 }
-
