@@ -8,7 +8,7 @@ struct Args {
     #[arg(short, long)]
     config: Option<PathBuf>,
 
-    /// Fall back to provisioning if the LEAP configuration file could not be open and parsed.
+    /// Fall back to provisioning if the LEAP configuration file could not be opened and parsed.
     #[arg(short = 'f', long = "fallback")]
     provision_fallback: bool,
 
