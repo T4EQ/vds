@@ -1,8 +1,10 @@
 use actix_web::{App, HttpServer, web};
 use anyhow::Context;
 use tokio::sync::mpsc;
+use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use std::{net::TcpListener, sync::Arc};
+use std::{io::stdout, net::TcpListener, path::Path, sync::Arc};
 
 use crate::cfg::LeapConfig;
 
@@ -14,6 +16,43 @@ mod api;
 mod downloader;
 mod manifest;
 mod static_files;
+
+pub async fn init_logging(logfile: Option<&Path>, debug: bool) {
+    let layered = tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                let level = if debug { "trace" } else { "info" };
+                tracing_subscriber::EnvFilter::new(level)
+            }),
+        )
+        .with(JsonStorageLayer)
+        .with(BunyanFormattingLayer::new("leap-server".into(), stdout));
+
+    if let Some(logfile) = logfile {
+        let logfile = logfile.to_owned();
+        let open_logfile = {
+            move || -> Box<dyn std::io::Write> {
+                Box::new(
+                    std::fs::File::options()
+                        .create(true)
+                        .append(true)
+                        .open(&logfile)
+                        .map_err(|e| format!("Unable to open logfile {logfile:?}: {e}"))
+                        .unwrap(),
+                )
+            }
+        };
+
+        layered
+            .with(BunyanFormattingLayer::new(
+                "leap-server".into(),
+                open_logfile,
+            ))
+            .init();
+    } else {
+        layered.init();
+    }
+}
 
 pub async fn run_provisioning(listener: TcpListener) -> anyhow::Result<()> {
     let server = HttpServer::new(move || {
