@@ -109,10 +109,6 @@ impl S3Backend {
     /// Checks that we can access the bucket using the given credentials. This might be used, for
     /// instance, to check that we have access to the bucket after the user has provisioned the
     /// system with the given credentials.
-    #[expect(
-        dead_code,
-        reason = "This method will be used for provisioning, but currently it is unused."
-    )]
     pub async fn verify_bucket_access(&self) -> anyhow::Result<()> {
         // Verify bucket access
         self.client

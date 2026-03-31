@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::provision::DynProvision;
 use crate::{cfg::LeapConfig, db::Database, downloader::UserCommand};
 
 use actix_web::web;
@@ -29,6 +30,20 @@ impl ApiData {
     }
 }
 
+/// Shared resources used in HTTP handlers
+#[derive(Debug)]
+pub struct ProvisionApiData {
+    provision: DynProvision,
+}
+
+impl ProvisionApiData {
+    pub fn new() -> Self {
+        Self {
+            provision: DynProvision::new(),
+        }
+    }
+}
+
 fn common_api_handlers() -> actix_web::Scope {
     web::scope("api").service(user::get_version)
 }
@@ -51,6 +66,10 @@ pub fn register_provisioning_handlers(app: &mut web::ServiceConfig) {
     app.service(
         web::scope("provision")
             .service(provision::set_network_config)
-            .service(provision::get_storage_devs),
+            .service(provision::get_storage_devs)
+            .service(provision::format_storage)
+            .service(provision::set_configuration)
+            .service(provision::complete_provisioning)
+            .service(provision::status),
     );
 }

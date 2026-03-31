@@ -19,7 +19,7 @@
 //!  - `GET` `api/content/{id}`. Obtains the requested content from the server. The path indicates
 //!    the resource ID.
 
-mod types;
+pub mod types;
 
 pub mod api {
     pub mod version {
@@ -54,6 +54,44 @@ pub mod api {
                     }
                 }
             }
+        }
+    }
+}
+
+pub mod provision {
+    pub mod network {
+        pub mod post {
+            pub use crate::types::{NetworkConfig, NetworkConfigResult};
+
+            /// The request to the `POST` `provision/network` endpoint
+            pub type Request = NetworkConfig;
+
+            /// The response to the `POST` `provision/network` request
+            pub type Response = NetworkConfigResult;
+        }
+    }
+
+    pub mod config {
+        pub mod post {
+            pub use crate::types::{LeapConfig, LeapConfigResult};
+
+            /// The request to the `POST` `provision/config` endpoint
+            pub type Request = LeapConfig;
+
+            /// The response to the `POST` `provision/config` request
+            pub type Response = LeapConfigResult;
+        }
+    }
+
+    pub mod status {
+        pub mod get {
+            pub use crate::types::ProvisionStatus;
+
+            /// The request to the `GET` `provision/status` endpoint
+            pub type Request = ();
+
+            /// The response to the `GET` `provision/status` endpoint
+            pub type Response = ProvisionStatus;
         }
     }
 }
