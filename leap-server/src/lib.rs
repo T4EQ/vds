@@ -1,12 +1,12 @@
 use actix_web::{App, HttpServer, web};
 use anyhow::Context;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use std::{io::stdout, net::TcpListener, path::Path, sync::Arc};
 
-use crate::cfg::LeapConfig;
+use crate::{api::ProvisionApiData, cfg::LeapConfig};
 
 pub mod build_info;
 pub mod cfg;
@@ -56,8 +56,10 @@ pub async fn init_logging(logfile: Option<&Path>, debug: bool) {
 }
 
 pub async fn run_provisioning(listener: TcpListener) -> anyhow::Result<()> {
+    let app_data = web::Data::new(Mutex::new(ProvisionApiData::new()));
     let server = HttpServer::new(move || {
         App::new()
+            .app_data(app_data.clone())
             .wrap(tracing_actix_web::TracingLogger::default())
             .configure(api::register_provisioning_handlers)
             .configure(static_files::register_provisioning_files)

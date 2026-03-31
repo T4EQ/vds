@@ -1,4 +1,53 @@
 //! Common data types used by the APIs
+//!
+use http::Uri;
+use secrecy::{ExposeSecret, SecretString};
+use std::net::Ipv4Addr;
+
+mod parse_uri {
+    //! Parses an [`http::Uri`] type using serde
+
+    use http::Uri;
+
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> std::result::Result<Uri, D::Error> {
+        d.deserialize_str(Visitor {})
+    }
+
+    pub fn serialize<S>(data: &Uri, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = format!("{data}");
+        serializer.serialize_str(&s)
+    }
+
+    struct Visitor {}
+
+    impl<'de> serde::de::Visitor<'de> for Visitor {
+        type Value = Uri;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            writeln!(formatter, "A valid URI")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            v.try_into()
+                .map_err(|e| E::custom(format!("{v} is an invalid URI: {e}")))
+        }
+    }
+}
+
+pub fn serialize_secret_str<S>(data: &SecretString, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(data.expose_secret())
+}
 
 /// Download progress. A number from 0 to 1, where 1 indicates completed and 0 not
 /// started.
@@ -55,4 +104,114 @@ pub struct BuildInfo {
     pub profile: String,
     pub rustc_version: String,
     pub features: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct RetryParams {
+    /// The initial backoff time after a download failure.
+    #[serde(with = "humantime_serde")]
+    pub initial_backoff: std::time::Duration,
+
+    /// The adjustement factor for the backoff after a failure. Must be larger than 1 so that
+    /// the backoff actually increments exponentially
+    pub backoff_factor: f64,
+
+    /// The maximum backoff time after a download failure.
+    #[serde(with = "humantime_serde")]
+    pub max_backoff: std::time::Duration,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct DownloaderConfig {
+    /// Number of maximum concurrent downloads.
+    pub concurrent_downloads: usize,
+
+    /// The interval at which the remote is queried for new content.
+    #[serde(with = "humantime_serde")]
+    pub update_interval: std::time::Duration,
+
+    /// Retry parameters when a download fails.
+    pub retry_params: RetryParams,
+}
+
+/// Configuration to access the S3 server. Note the bucket is handled separately in the main
+/// configuration.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct S3Config {
+    /// URI of the bucket
+    #[serde(with = "parse_uri")]
+    pub bucket: Uri,
+
+    /// Access key ID.
+    #[serde(serialize_with = "serialize_secret_str")]
+    pub access_key_id: SecretString,
+
+    /// Secret Access key.
+    #[serde(serialize_with = "serialize_secret_str")]
+    pub secret_access_key: SecretString,
+
+    /// S3 Endpoint URL. Defaults to AWS if not given.
+    pub endpoint_url: Option<String>,
+
+    /// Uses path-style access to buckets instead of dns-based access. Use this if your endpoint is
+    /// not AWS and you are unable to connect to your bucket (MinIO, Ceph, etc).
+    pub force_path_style: Option<bool>,
+
+    /// AWS region. Defaults to `us-east-1`.
+    pub region: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct LeapConfig {
+    /// Downloader service configuration.
+    pub downloader_config: DownloaderConfig,
+
+    /// S3 configuration.
+    pub s3_config: S3Config,
+}
+
+pub type LeapConfigResult = std::result::Result<(), String>;
+
+// At this time we only support Ipv4.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct StaticIpConfig {
+    pub ip_address: Ipv4Addr,
+    pub net_mask: Ipv4Addr,
+    pub gateway: Ipv4Addr,
+    pub dns: Vec<Ipv4Addr>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum IpConfig {
+    Dhcp,
+    Static(StaticIpConfig),
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct WirelessConfig {
+    pub ssid: String,
+    #[serde(serialize_with = "serialize_secret_str")]
+    pub password: SecretString,
+    pub ip_config: IpConfig,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct WiredConfig {
+    pub ip_config: IpConfig,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum NetworkConfig {
+    Wireless(WirelessConfig),
+    Wired(WiredConfig),
+}
+
+pub type NetworkConfigResult = std::result::Result<(), String>;
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
+pub enum ProvisionStatus {
+    NetworkConfig,
+    StorageConfig,
+    LeapConfig,
+    Completed,
 }

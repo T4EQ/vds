@@ -1,5 +1,5 @@
 mod backend;
-mod s3backend;
+pub mod s3backend;
 mod tasks;
 
 use std::{path::PathBuf, sync::Arc};

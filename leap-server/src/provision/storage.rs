@@ -20,25 +20,25 @@ pub enum BlockDeviceType {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BlockDevice {
     #[serde(rename = "kname")]
-    name: String,
+    pub name: String,
 
     #[serde(rename = "rm")]
-    removable: bool,
+    pub removable: bool,
 
     #[serde(rename = "ro")]
-    read_only: bool,
+    pub read_only: bool,
 
     #[serde(rename = "type")]
-    ty: BlockDeviceType,
+    pub ty: BlockDeviceType,
 
-    size: usize,
+    pub size: usize,
 
-    mountpoints: Vec<String>,
+    pub mountpoints: Vec<String>,
 
-    subsystems: String,
+    pub subsystems: String,
 
     #[serde(default = "default_children_node")]
-    children: Vec<BlockDevice>,
+    pub children: Vec<BlockDevice>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -88,17 +88,20 @@ async fn unmount_block_dev(block_dev: &BlockDevice) -> anyhow::Result<()> {
     for mount_point in &block_dev.mountpoints {
         let path: PathBuf = mount_point.into();
         tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            tracing::info!("Unmounting: {}", path.display());
             nix::mount::umount(&path)
                 .with_context(|| format!("Unable to unmount {}", path.display()))?;
             Ok(())
         })
-        .await?;
+        .await??;
     }
     Ok(())
 }
 
 pub async fn prepare_storage_medium(path: &Path) -> anyhow::Result<()> {
     let all_block_devs = list_blockdevs().await?;
+
+    tracing::info!("Preparing storage medium: {}", path.display());
 
     let block_dev = all_block_devs
         .iter()
@@ -107,7 +110,37 @@ pub async fn prepare_storage_medium(path: &Path) -> anyhow::Result<()> {
 
     unmount_block_dev(block_dev).await?;
 
+    tracing::info!("Create ext2 fs for: {}", path.display());
+
     // Create filesystem
+    let mke2fs_result = tokio::process::Command::new("mke2fs")
+        .arg("-L")
+        .arg("LEAP_DATA")
+        .arg(path)
+        .output()
+        .await?;
+    if !mke2fs_result.status.success() || mke2fs_result.status.code() != Some(0) {
+        tracing::error!("Failure creating ext2 fs {mke2fs_result:?}");
+        anyhow::bail!("Failure to format storage {mke2fs_result:?}");
+    }
+
+    tracing::info!("ext2fs created");
+    tracing::info!("mounting file system");
+
+    let path = path.to_owned();
+    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        nix::mount::mount(
+            Some(&path),
+            "/var/lib/leap",
+            Some("ext2"),
+            nix::mount::MsFlags::MS_NOATIME,
+            Option::<&str>::None,
+        )?;
+        Ok(())
+    })
+    .await??;
+
+    tracing::info!("file system mounted");
 
     Ok(())
 }

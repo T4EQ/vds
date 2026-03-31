@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use config::Config;
 use http::Uri;
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 
 fn default_path_style() -> bool {
     false
@@ -13,7 +13,20 @@ fn default_aws_region() -> String {
     "us-east-1".to_string()
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+pub fn serialize_secret_str<S>(
+    data: &Option<SecretString>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match data.as_ref() {
+        Some(secret) => serializer.serialize_some(secret.expose_secret()),
+        None => serializer.serialize_none(),
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct RetryParams {
     /// The initial backoff time after a download failure.
     #[serde(with = "humantime_serde")]
@@ -28,7 +41,7 @@ pub struct RetryParams {
     pub max_backoff: std::time::Duration,
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct DownloaderConfig {
     /// Number of maximum concurrent downloads.
     pub concurrent_downloads: usize,
@@ -48,7 +61,7 @@ pub struct DownloaderConfig {
     pub retry_params: RetryParams,
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct DbConfig {
     /// The maximum amount of time that the DB thread will wait until the DB is available for its
     /// operation. Sqlite does not allow concurrent reads and writes, and therefore, it might block
@@ -84,7 +97,7 @@ impl DbConfig {
 
 /// Configuration to access the S3 server. Note the bucket is handled separately in the main
 /// configuration.
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct S3Config {
     /// S3 Endpoint URL. Defaults to AWS if not given.
     pub endpoint_url: Option<String>,
@@ -95,9 +108,11 @@ pub struct S3Config {
     pub force_path_style: bool,
 
     /// Access key ID.
+    #[serde(serialize_with = "serialize_secret_str")]
     pub access_key_id: Option<SecretString>,
 
     /// Secret Access key.
+    #[serde(serialize_with = "serialize_secret_str")]
     pub secret_access_key: Option<SecretString>,
 
     /// AWS region. Defaults to `us-east-1`.
@@ -106,7 +121,7 @@ pub struct S3Config {
 }
 
 /// Configuration of the LEAP application.
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct LeapConfig {
     /// Enables debug logging/tracing.
     pub debug: bool,
@@ -146,6 +161,14 @@ mod parse_uri {
         d: D,
     ) -> std::result::Result<Uri, D::Error> {
         d.deserialize_str(Visitor {})
+    }
+
+    pub fn serialize<S>(data: &Uri, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = format!("{data}");
+        serializer.serialize_str(&s)
     }
 
     struct Visitor {}
