@@ -3,10 +3,31 @@ use std::path::PathBuf;
 use actix_web::{HttpResponse, Responder, get, post, web};
 use leap_api::provision::config::post::LeapConfig;
 use leap_api::provision::network::post::NetworkConfig;
+use leap_api::provision::storage::devices::get::BlockDevice;
+use leap_api::types::DeviceType;
 use serde::Deserialize;
 use tokio::sync::Mutex;
 
 use crate::api::ProvisionApiData;
+
+impl From<crate::provision::BlockDeviceType> for DeviceType {
+    fn from(value: crate::provision::BlockDeviceType) -> Self {
+        match value {
+            crate::provision::BlockDeviceType::Disk => Self::Disk,
+            crate::provision::BlockDeviceType::Partition => Self::Partition,
+        }
+    }
+}
+
+impl From<crate::provision::BlockDevice> for BlockDevice {
+    fn from(value: crate::provision::BlockDevice) -> Self {
+        Self {
+            name: value.name,
+            size: value.size,
+            device_type: value.ty.into(),
+        }
+    }
+}
 
 #[tracing::instrument(fields(request_id = %uuid::Uuid::new_v4()))]
 #[post("network")]
@@ -28,7 +49,10 @@ async fn set_network_config(
 async fn get_storage_devs(provision_data: web::Data<Mutex<ProvisionApiData>>) -> impl Responder {
     match provision_data.try_lock() {
         Ok(lock) => match lock.provision.list_blockdevs().await {
-            Ok(blockdevs) => HttpResponse::Ok().json(blockdevs),
+            Ok(blockdevs) => {
+                let blockdevs: Vec<BlockDevice> = blockdevs.into_iter().map(|b| b.into()).collect();
+                HttpResponse::Ok().json(blockdevs)
+            }
             Err(err) => HttpResponse::InternalServerError().body(format!("{err}")),
         },
         Err(_) => HttpResponse::BadRequest().body("Another provisioning operation is ongoing"),

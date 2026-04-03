@@ -8,6 +8,8 @@ mod cfg;
 mod network;
 mod storage;
 
+pub use storage::{BlockDevice, BlockDeviceType};
+
 #[derive(Debug)]
 pub struct NetworkStep {}
 

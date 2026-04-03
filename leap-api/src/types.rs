@@ -2,7 +2,7 @@
 //!
 use http::Uri;
 use secrecy::{ExposeSecret, SecretString};
-use std::net::Ipv4Addr;
+use std::{fmt::Display, net::Ipv4Addr};
 
 mod parse_uri {
     //! Parses an [`http::Uri`] type using serde
@@ -214,4 +214,26 @@ pub enum ProvisionStatus {
     StorageConfig,
     LeapConfig,
     Completed,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub enum DeviceType {
+    Disk,
+    Partition,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub struct BlockDevice {
+    pub name: String,
+    pub size: u64,
+    pub device_type: DeviceType,
+}
+
+impl Display for DeviceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeviceType::Partition => write!(f, "partition"),
+            DeviceType::Disk => write!(f, "disk"),
+        }
+    }
 }

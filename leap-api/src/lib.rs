@@ -71,6 +71,20 @@ pub mod provision {
         }
     }
 
+    pub mod storage {
+        pub mod devices {
+            pub mod get {
+                pub use crate::types::BlockDevice;
+
+                /// The request to the `GET` `provision/storage/devices` endpoint
+                pub type Request = ();
+
+                /// The response to the `GET` `provision/storage/devices` endpoint
+                pub type Response = Vec<BlockDevice>;
+            }
+        }
+    }
+
     pub mod config {
         pub mod post {
             pub use crate::types::{LeapConfig, LeapConfigResult};
