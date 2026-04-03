@@ -2652,6 +2652,7 @@ dependencies = [
  "gloo-net 0.7.0",
  "leap-api",
  "log",
+ "secrecy",
  "serde",
  "serde_json",
  "wasm-bindgen",
