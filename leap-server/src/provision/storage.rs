@@ -31,7 +31,7 @@ pub struct BlockDevice {
     #[serde(rename = "type")]
     pub ty: BlockDeviceType,
 
-    pub size: usize,
+    pub size: u64,
 
     pub mountpoints: Vec<String>,
 
