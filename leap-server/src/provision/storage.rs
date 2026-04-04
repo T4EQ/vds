@@ -110,21 +110,23 @@ pub async fn prepare_storage_medium(path: &Path) -> anyhow::Result<()> {
 
     unmount_block_dev(block_dev).await?;
 
-    tracing::info!("Create ext2 fs for: {}", path.display());
+    tracing::info!("Create ext4 fs for: {}", path.display());
 
     // Create filesystem
     let mke2fs_result = tokio::process::Command::new("mke2fs")
         .arg("-L")
         .arg("LEAP_DATA")
+        .arg("-t")
+        .arg("ext4")
         .arg(path)
         .output()
         .await?;
     if !mke2fs_result.status.success() || mke2fs_result.status.code() != Some(0) {
-        tracing::error!("Failure creating ext2 fs {mke2fs_result:?}");
+        tracing::error!("Failure creating ext4 fs {mke2fs_result:?}");
         anyhow::bail!("Failure to format storage {mke2fs_result:?}");
     }
 
-    tracing::info!("ext2fs created");
+    tracing::info!("ext4 fs created");
     tracing::info!("mounting file system");
 
     let path = path.to_owned();
@@ -132,7 +134,7 @@ pub async fn prepare_storage_medium(path: &Path) -> anyhow::Result<()> {
         nix::mount::mount(
             Some(&path),
             "/var/lib/leap",
-            Some("ext2"),
+            Some("ext4"),
             nix::mount::MsFlags::MS_NOATIME,
             Option::<&str>::None,
         )?;
@@ -141,6 +143,5 @@ pub async fn prepare_storage_medium(path: &Path) -> anyhow::Result<()> {
     .await??;
 
     tracing::info!("file system mounted");
-
     Ok(())
 }
