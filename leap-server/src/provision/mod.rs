@@ -11,23 +11,23 @@ mod storage;
 pub use storage::{BlockDevice, BlockDeviceType};
 
 #[derive(Debug)]
-pub struct NetworkStep {}
+pub struct StorageStep {}
 
 #[derive(Debug)]
-pub struct StorageStep {
-    network_config: NetworkConfig,
+pub struct NetworkStep {
+    storage_node: PathBuf,
 }
 
 #[derive(Debug)]
 pub struct LeapConfigStep {
-    network_config: NetworkConfig,
     storage_node: PathBuf,
+    network_config: NetworkConfig,
 }
 
 #[derive(Debug, serde::Serialize)]
 pub struct CompleteStep {
-    network_config: NetworkConfig,
     storage_node: PathBuf,
+    network_config: NetworkConfig,
     configuration: LeapConfig,
 }
 
@@ -49,9 +49,9 @@ pub struct Provision<Step: ProvisionStep> {
 
 impl<S: ProvisionStep> Provision<S> {
     /// Constructs the Provision in its default state
-    pub const fn new() -> Provision<NetworkStep> {
+    pub const fn new() -> Provision<StorageStep> {
         Provision {
-            inner: NetworkStep {},
+            inner: StorageStep {},
         }
     }
 
@@ -61,38 +61,16 @@ impl<S: ProvisionStep> Provision<S> {
     }
 }
 
-impl Provision<NetworkStep> {
-    pub async fn configure_network(
-        self,
-        network_config: &NetworkConfig,
-    ) -> Result<Provision<StorageStep>, (anyhow::Error, Provision<NetworkStep>)> {
-        // TODO: this is not yet implemented
-        Ok(Provision {
-            inner: StorageStep {
-                network_config: network_config.clone(),
-            },
-        })
-    }
-}
-
 impl Provision<StorageStep> {
-    pub async fn revert(self) -> Provision<NetworkStep> {
-        // TODO: need to roll back some networking actions?
-        Provision {
-            inner: NetworkStep {},
-        }
-    }
-
     pub async fn configure_storage(
         self,
         path: &Path,
-    ) -> Result<Provision<LeapConfigStep>, (anyhow::Error, Provision<StorageStep>)> {
+    ) -> Result<Provision<NetworkStep>, (anyhow::Error, Provision<StorageStep>)> {
         if let Err(err) = storage::prepare_storage_medium(path).await {
             Err((err, self))
         } else {
             Ok(Provision {
-                inner: LeapConfigStep {
-                    network_config: self.inner.network_config,
+                inner: NetworkStep {
                     storage_node: path.to_path_buf(),
                 },
             })
@@ -100,11 +78,33 @@ impl Provision<StorageStep> {
     }
 }
 
-impl Provision<LeapConfigStep> {
+impl Provision<NetworkStep> {
     pub async fn revert(self) -> Provision<StorageStep> {
+        // TODO: need to roll back some storage action?
         Provision {
-            inner: StorageStep {
-                network_config: self.inner.network_config,
+            inner: StorageStep {},
+        }
+    }
+
+    pub async fn configure_network(
+        self,
+        network_config: &NetworkConfig,
+    ) -> Result<Provision<LeapConfigStep>, (anyhow::Error, Provision<NetworkStep>)> {
+        // TODO: this is not yet implemented
+        Ok(Provision {
+            inner: LeapConfigStep {
+                storage_node: self.inner.storage_node,
+                network_config: network_config.clone(),
+            },
+        })
+    }
+}
+
+impl Provision<LeapConfigStep> {
+    pub async fn revert(self) -> Provision<NetworkStep> {
+        Provision {
+            inner: NetworkStep {
+                storage_node: self.inner.storage_node,
             },
         }
     }
@@ -183,8 +183,8 @@ pub struct DynProvision(Option<DynProvisionImpl>);
 
 impl DynProvision {
     pub const fn new() -> Self {
-        DynProvision(Some(DynProvisionImpl::Network(
-            Provision::<NetworkStep>::new(),
+        DynProvision(Some(DynProvisionImpl::Storage(
+            Provision::<StorageStep>::new(),
         )))
     }
 
@@ -209,7 +209,7 @@ impl DynProvision {
             Some(DynProvisionImpl::Network(p)) => {
                 self.handle_retval(p.configure_network(network_config).await)?
             }
-            Some(DynProvisionImpl::Storage(p)) => {
+            Some(DynProvisionImpl::LeapConfig(p)) => {
                 self.handle_retval(p.revert().await.configure_network(network_config).await)?;
             }
             Some(v) => {
@@ -228,7 +228,7 @@ impl DynProvision {
             Some(DynProvisionImpl::Storage(p)) => {
                 self.handle_retval(p.configure_storage(device_path).await)?;
             }
-            Some(DynProvisionImpl::LeapConfig(p)) => {
+            Some(DynProvisionImpl::Network(p)) => {
                 self.handle_retval(p.revert().await.configure_storage(device_path).await)?;
             }
             Some(v) => {
