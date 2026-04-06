@@ -1,3 +1,11 @@
+//! Implements the provisioning state machine for the LEAP server. Provisioning is made of:
+//! - A storage step in charge of formatting the external storage used for LEAP.
+//! - A networking step in charge of configuring the networking of LEAP (Wired/Wireless +
+//!   credentials and DHCP vs manual configuration).
+//! - A LEAP configuration step that creates the `config.toml` file for LEAP and validates it.
+//! - A completion step which triggers the system reboot and saves a record of the provision
+//!   process configuration.
+
 use crate::cfg::LeapConfig;
 use leap_api::types::NetworkConfig;
 use leap_api::types::ProvisionStatus;
@@ -15,20 +23,24 @@ const PROVISION_FILE_PATH: &str = "/var/lib/leap/provision.json";
 
 pub use storage::{BlockDevice, BlockDeviceType};
 
+/// Implementation of the storage step
 #[derive(Debug)]
 pub struct StorageStep {}
 
+/// Implementation of the network step
 #[derive(Debug)]
 pub struct NetworkStep {
     storage_node: PathBuf,
 }
 
+/// Implementation of the LEAP configuration step
 #[derive(Debug)]
 pub struct LeapConfigStep {
     storage_node: PathBuf,
     network_config: NetworkConfig,
 }
 
+/// Implementation of the completion step
 #[derive(Debug, serde::Serialize)]
 pub struct CompleteStep {
     storage_node: PathBuf,
@@ -68,6 +80,7 @@ impl<S: ProvisionStep> Provision<S> {
 }
 
 impl Provision<StorageStep> {
+    /// Formats the external storage used for LEAP.
     pub async fn configure_storage(
         self,
         path: &Path,
@@ -85,6 +98,7 @@ impl Provision<StorageStep> {
 }
 
 impl Provision<NetworkStep> {
+    /// Reverts to the previous step.
     pub async fn revert(self) -> Provision<StorageStep> {
         // TODO: need to roll back some storage action?
         Provision {
@@ -92,6 +106,7 @@ impl Provision<NetworkStep> {
         }
     }
 
+    /// Configures the network for LEAP.
     pub async fn configure_network(
         self,
         network_config: &NetworkConfig,
@@ -109,6 +124,7 @@ impl Provision<NetworkStep> {
 }
 
 impl Provision<LeapConfigStep> {
+    /// Reverts to the previous step.
     pub async fn revert(self) -> Provision<NetworkStep> {
         Provision {
             inner: NetworkStep {
@@ -117,6 +133,7 @@ impl Provision<LeapConfigStep> {
         }
     }
 
+    /// Saves the LEAP configuration to disk after validation.
     pub async fn configure_leap(
         self,
         config: &leap_api::provision::config::post::LeapConfig,
@@ -135,6 +152,7 @@ impl Provision<LeapConfigStep> {
 }
 
 impl Provision<CompleteStep> {
+    /// Completes the provisioning process, triggering a reboot.
     pub async fn finish(self) -> anyhow::Result<()> {
         // Save a record of the provisioning process
         tokio::fs::write(PROVISION_FILE_PATH, &serde_json::to_vec(&self.inner)?).await?;
@@ -150,6 +168,9 @@ impl Provision<CompleteStep> {
     }
 }
 
+/// Dynamic representation of the Provision state machine. Wraps the type-states so that methods
+/// can be called without knowing the exact state of the state machine. Handles invalid calls
+/// gracefully.
 #[allow(
     clippy::large_enum_variant,
     reason = "No improvement would be made here if we box each variant"
@@ -198,13 +219,14 @@ impl ProvisionVariant for CompleteStep {
 pub struct DynProvision(Option<DynProvisionImpl>);
 
 impl DynProvision {
+    /// Constructs the state machine starting with the storage state.
     pub async fn new() -> anyhow::Result<Self> {
         Ok(DynProvision(Some(DynProvisionImpl::Storage(
             Provision::<StorageStep>::new().await?,
         ))))
     }
 
-    /// Listing the block devices can be done at any step
+    /// Listing the block devices, which can be done at any step
     pub async fn list_blockdevs(&self) -> anyhow::Result<Vec<storage::BlockDevice>> {
         match self.0.as_ref() {
             Some(DynProvisionImpl::Network(p)) => p.list_blockdevs().await,
@@ -217,6 +239,7 @@ impl DynProvision {
         }
     }
 
+    /// Configures the network for LEAP. Only allowed in the Network and LeapConfig states.
     pub async fn configure_network(
         &mut self,
         network_config: &NetworkConfig,
@@ -239,6 +262,7 @@ impl DynProvision {
         Ok(())
     }
 
+    /// Formats the external storage used for LEAP. Only allowed in the Storage and Network steps.
     pub async fn configure_storage(&mut self, device_path: &Path) -> anyhow::Result<()> {
         match self.0.take() {
             Some(DynProvisionImpl::Storage(p)) => {
@@ -258,6 +282,8 @@ impl DynProvision {
         Ok(())
     }
 
+    /// Saves the LEAP configuration to disk after validation. Only allowed in the LEAP
+    /// configuration state.
     pub async fn configure_leap(
         &mut self,
         config: &leap_api::provision::config::post::LeapConfig,
@@ -277,6 +303,7 @@ impl DynProvision {
         Ok(())
     }
 
+    /// Completes the provisioning process, triggering a reboot.
     pub async fn finish(&mut self) -> anyhow::Result<()> {
         match self.0.take() {
             Some(DynProvisionImpl::Complete(p)) => {
@@ -293,6 +320,7 @@ impl DynProvision {
         }
     }
 
+    /// Returns the current status of the provisioning process.
     pub fn status(&self) -> anyhow::Result<ProvisionStatus> {
         match self.0.as_ref() {
             Some(DynProvisionImpl::Network(_)) => Ok(ProvisionStatus::NetworkConfig),
