@@ -1,3 +1,6 @@
+//! Provision module for the LEAP configuration file. Exposes [`provision_configuration`], which
+//! receives external leap configuration and saves it to disk after validation.
+
 use std::time::Duration;
 
 use super::{CONTENT_PATH, MOUNT_PATH, RUNTIME_PATH};
@@ -73,6 +76,10 @@ async fn wait_timesync(timeout: std::time::Duration) -> anyhow::Result<()> {
     anyhow::bail!("Timeout while waiting for time synchronization");
 }
 
+/// Saves LEAP configuration to disk. Ensures that the S3 credentials are valid by enabling
+/// temporarily the network connection, then waiting for time sync (NTP) to ensure HTTPs will work,
+/// and finally by checking connectivity to S3. The provision network configuration is restored
+/// before exiting. The configuration is only persisted if validation succeeds.
 pub async fn provision_configuration(
     config: &leap_api::provision::config::post::LeapConfig,
 ) -> anyhow::Result<LeapConfig> {
