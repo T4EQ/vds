@@ -5,6 +5,8 @@ use config::Config;
 use http::Uri;
 use secrecy::{ExposeSecret, SecretString};
 
+pub const DEFAULT_CONFIG_PATH: &str = "/var/lib/leap/config/config.toml";
+
 fn default_path_style() -> bool {
     false
 }
