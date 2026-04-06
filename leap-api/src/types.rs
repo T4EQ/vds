@@ -206,6 +206,16 @@ pub enum NetworkConfig {
     Wired(WiredConfig),
 }
 
+impl NetworkConfig {
+    pub fn is_wired(&self) -> bool {
+        matches!(self, NetworkConfig::Wired(_))
+    }
+
+    pub fn is_wireless(&self) -> bool {
+        matches!(self, NetworkConfig::Wireless(_))
+    }
+}
+
 pub type NetworkConfigResult = std::result::Result<(), String>;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]

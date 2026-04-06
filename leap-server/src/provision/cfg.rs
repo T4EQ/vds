@@ -45,33 +45,56 @@ impl From<&leap_api::provision::config::post::LeapConfig> for LeapConfig {
 pub async fn provision_configuration(
     config: &leap_api::provision::config::post::LeapConfig,
 ) -> anyhow::Result<LeapConfig> {
+    tracing::info!("Checking that the block device is mounted.");
     let blockdevs = super::storage::list_blockdevs().await?;
     let mounted = blockdevs
         .iter()
         .any(|b| b.mountpoints.contains(&"/var/lib/leap".to_owned()));
     if !mounted {
+        tracing::error!("Block device is not mounted at /var/lib/leap");
         anyhow::bail!("Cannot apply configuration. /var/lib/leap is not mounted");
     }
+    tracing::info!("Block device is mounted");
 
     let config: LeapConfig = config.into();
 
-    // Check S3 access to validate configuration
-    let bucket = config
-        .downloader_config
-        .remote_server
-        .host()
-        .ok_or_else(|| anyhow::anyhow!("S3 URI must specify a bucket name"))?;
-    let s3_backend =
-        crate::downloader::s3backend::S3Backend::new(bucket, &config.s3_config).await?;
-    s3_backend.verify_bucket_access().await?;
+    // FIXME: There seems to be an issue here that triggers a segfault in AWS code... Can't really
+    // tell what it is at this point.
+    //
+    // Check S3 access to validate configuration. For this, we need to temporarily enable the
+    // network setup and then come back to the original setup network.
+    // {
+    //     let config = config.clone();
+    //     super::network::temporarily_enable_network_config(async move || -> anyhow::Result<()> {
+    //         let bucket = config
+    //             .downloader_config
+    //             .remote_server
+    //             .host()
+    //             .ok_or_else(|| {
+    //                 tracing::error!("Invalid S3 URI");
+    //                 anyhow::anyhow!("S3 URI must specify a bucket name")
+    //             })?;
+    //         tracing::info!("Checking access to bucket.");
+    //         let s3_backend =
+    //             crate::downloader::s3backend::S3Backend::new(bucket, &config.s3_config).await?;
+    //         s3_backend.verify_bucket_access().await.inspect_err(|e| {
+    //             tracing::error!("Bucket access failed: {e}");
+    //         })?;
+    //         tracing::info!("Bucket access Ok");
+    //         Ok(())
+    //     })
+    //     .await?;
+    // }
 
     // Save configuration to file
+    tracing::info!("Saving configuration to file");
     let target_dir: std::path::PathBuf = "/var/lib/leap/config/config.toml".into();
     if let Some(parent) = target_dir.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
     let serialized_config = toml::to_string(&config)?;
     tokio::fs::write(target_dir, serialized_config.as_bytes()).await?;
+    tracing::info!("Configuration saved.");
 
     Ok(config)
 }

@@ -1,0 +1,459 @@
+use anyhow::Context as _;
+use std::{collections::HashMap, net::Ipv4Addr};
+
+use dbus::arg::{PropMap, Variant};
+use uuid::Uuid;
+
+mod networkmanager;
+mod networkmanager_connection_active;
+mod networkmanager_device;
+mod networkmanager_settings;
+mod networkmanager_settings_connection;
+
+const BUS_NAME: &str = "org.freedesktop.NetworkManager";
+const NM_DEV: &str = "/org/freedesktop/NetworkManager";
+const SETTINGS_DEV: &str = "/org/freedesktop/NetworkManager/Settings";
+
+pub struct NetworkManager {
+    dbus_connection: dbus::blocking::Connection,
+}
+
+impl NetworkManager {
+    pub fn new() -> anyhow::Result<Self> {
+        let dbus_connection = dbus::blocking::Connection::new_system()?;
+        Ok(Self { dbus_connection })
+    }
+
+    pub fn list_devices(&self) -> anyhow::Result<Vec<DeviceRef<'_>>> {
+        let devices = {
+            let p = self.dbus_connection.with_proxy(
+                BUS_NAME,
+                NM_DEV,
+                std::time::Duration::from_secs(5),
+            );
+
+            use networkmanager::OrgFreedesktopNetworkManager as _;
+            p.get_all_devices()?
+        };
+
+        let devs = {
+            let mut devs = vec![];
+            for dev in &devices {
+                let p = self.dbus_connection.with_proxy(
+                    BUS_NAME,
+                    dev,
+                    std::time::Duration::from_secs(5),
+                );
+
+                use networkmanager_device::OrgFreedesktopNetworkManagerDevice as _;
+                devs.push(DeviceRef {
+                    path: dev.clone(),
+                    interface: p.interface()?,
+                    dev_type: p.device_type()?.into(),
+                });
+            }
+            devs
+        };
+        Ok(devs)
+    }
+
+    pub fn init_connection(
+        &self,
+        settings: &ConnectionSettings,
+    ) -> anyhow::Result<ConnectionRef<'_>> {
+        let p = self.dbus_connection.with_proxy(
+            BUS_NAME,
+            SETTINGS_DEV,
+            std::time::Duration::from_secs(5),
+        );
+
+        use networkmanager_settings::OrgFreedesktopNetworkManagerSettings;
+        let path = p.add_connection_unsaved(settings.to_props())?;
+        Ok(ConnectionRef { path })
+    }
+
+    pub fn find_connection(&self, uuid: &Uuid) -> anyhow::Result<Option<ConnectionRef<'_>>> {
+        let p = self.dbus_connection.with_proxy(
+            BUS_NAME,
+            SETTINGS_DEV,
+            std::time::Duration::from_secs(5),
+        );
+
+        use networkmanager_settings::OrgFreedesktopNetworkManagerSettings;
+        let path = p.get_connection_by_uuid(&uuid.to_string()).ok();
+        Ok(path.map(|p| ConnectionRef { path: p }))
+    }
+
+    pub fn query_connection_type(
+        &self,
+        connection: &ConnectionRef<'_>,
+    ) -> anyhow::Result<ConnectionType> {
+        let p = self.dbus_connection.with_proxy(
+            BUS_NAME,
+            &connection.path,
+            std::time::Duration::from_secs(5),
+        );
+
+        use networkmanager_settings_connection::OrgFreedesktopNetworkManagerSettingsConnection;
+        let settings = p.get_settings()?;
+        let Some(props) = settings.get("connection") else {
+            anyhow::bail!("Connection settings do not have `connection` section");
+        };
+        let Some(conn_type) = props.get("type") else {
+            anyhow::bail!("Connection settings do not have `connection.type` section");
+        };
+
+        let str = conn_type
+            .0
+            .as_str()
+            .context("Could not get connection type. It is not a string")?;
+        Ok(str.try_into()?)
+    }
+
+    pub fn activate_connection(
+        &self,
+        connection_ref: &ConnectionRef<'_>,
+        device: &DeviceRef<'_>,
+    ) -> anyhow::Result<ActiveConnectionRef<'_>> {
+        let p =
+            self.dbus_connection
+                .with_proxy(BUS_NAME, NM_DEV, std::time::Duration::from_secs(5));
+
+        use networkmanager::OrgFreedesktopNetworkManager;
+        let active_connection =
+            p.activate_connection(connection_ref.path.clone(), device.path.clone(), "/".into())?;
+
+        Ok(ActiveConnectionRef {
+            path: active_connection,
+        })
+    }
+
+    pub fn delete_connection(&self, connection_ref: ConnectionRef<'_>) -> anyhow::Result<()> {
+        let p = self.dbus_connection.with_proxy(
+            BUS_NAME,
+            connection_ref.path,
+            std::time::Duration::from_secs(5),
+        );
+
+        use networkmanager_settings_connection::OrgFreedesktopNetworkManagerSettingsConnection;
+        p.delete()?;
+        Ok(())
+    }
+
+    pub fn save_connection(&self, connection_ref: &ConnectionRef<'_>) -> anyhow::Result<()> {
+        let p = self.dbus_connection.with_proxy(
+            BUS_NAME,
+            &connection_ref.path,
+            std::time::Duration::from_secs(5),
+        );
+
+        use networkmanager_settings_connection::OrgFreedesktopNetworkManagerSettingsConnection;
+        p.save()?;
+        Ok(())
+    }
+
+    pub fn connection_status(
+        &self,
+        active_connection: &ActiveConnectionRef<'_>,
+    ) -> anyhow::Result<ConnectionState> {
+        let p = self.dbus_connection.with_proxy(
+            BUS_NAME,
+            &active_connection.path,
+            std::time::Duration::from_secs(5),
+        );
+
+        use networkmanager_connection_active::OrgFreedesktopNetworkManagerConnectionActive;
+        let active_connection = p.state()?.try_into()?;
+        Ok(active_connection)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceType {
+    Ethernet = 1,
+    Wifi = 2,
+    Other,
+}
+
+impl From<u32> for DeviceType {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Self::Ethernet,
+            2 => Self::Wifi,
+            _ => Self::Other,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceRef<'a> {
+    pub path: dbus::strings::Path<'a>,
+    pub interface: String,
+    pub dev_type: DeviceType,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WirelessMode {
+    AccessPoint,
+    Infrastructure,
+}
+
+impl WirelessMode {
+    fn to_nm_mode(&self) -> &'static str {
+        match self {
+            WirelessMode::AccessPoint => "ap",
+            WirelessMode::Infrastructure => "infrastructure",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectionType {
+    Wireless,
+    Wired,
+}
+
+impl TryFrom<&str> for ConnectionType {
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value {
+            "802-3-ethernet" => Self::Wired,
+            "802-11-wireless" => Self::Wireless,
+            _ => {
+                anyhow::bail!("Invlaid connection type: {value:?}");
+            }
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectionTypeConfig {
+    Wireless {
+        ssid: Vec<u8>,
+        password: String,
+        mode: WirelessMode,
+    },
+    Wired,
+}
+
+impl ConnectionTypeConfig {
+    fn to_nm_type(&self) -> &'static str {
+        match self {
+            ConnectionTypeConfig::Wired => "802-3-ethernet",
+            ConnectionTypeConfig::Wireless { .. } => "802-11-wireless",
+        }
+    }
+
+    fn to_security_nm_type(&self) -> &'static str {
+        match self {
+            ConnectionTypeConfig::Wired => unreachable!(),
+            ConnectionTypeConfig::Wireless { .. } => "802-11-wireless-security",
+        }
+    }
+
+    fn insert_properties(&self, map: &mut HashMap<&str, PropMap>) {
+        if let ConnectionTypeConfig::Wireless {
+            ssid,
+            password,
+            mode,
+        } = &self
+        {
+            let mut wifi = PropMap::new();
+            wifi.insert(
+                "mode".to_owned(),
+                Variant(Box::new(mode.to_nm_mode().to_owned())),
+            );
+            wifi.insert("ssid".to_owned(), Variant(Box::new(ssid.clone())));
+            let nm_type = self.to_nm_type();
+            map.insert(nm_type, wifi);
+
+            let mut wifi_security = PropMap::new();
+            wifi_security.insert(
+                "key-mgmt".to_owned(),
+                Variant(Box::new("wpa-psk".to_owned())),
+            );
+            wifi_security.insert("psk".to_owned(), Variant(Box::new(password.to_owned())));
+            let nm_type_security = self.to_security_nm_type();
+            map.insert(nm_type_security, wifi_security);
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ipv4Method {
+    Shared,
+    Auto,
+    Manual {
+        ip_address: Ipv4Addr,
+        subnet_mask: Ipv4Addr,
+        gateway_address: Ipv4Addr,
+    },
+    Disabled,
+}
+
+impl Ipv4Method {
+    fn to_nm_method(&self) -> &'static str {
+        match self {
+            Ipv4Method::Shared => "shared",
+            Ipv4Method::Auto => "auto",
+            Ipv4Method::Manual { .. } => "manual",
+            Ipv4Method::Disabled => "disabled",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ipv4Settings {
+    pub method: Ipv4Method,
+}
+
+impl Ipv4Settings {
+    fn insert_properties(&self, map: &mut HashMap<&str, PropMap>) {
+        let mut ipv4 = PropMap::new();
+        ipv4.insert(
+            "method".to_owned(),
+            Variant(Box::new(self.method.to_nm_method().to_owned())),
+        );
+        if let Ipv4Method::Manual {
+            ip_address,
+            subnet_mask,
+            gateway_address,
+        } = &self.method
+        {
+            let addr_data = vec![{
+                let mut m: HashMap<String, Variant<Box<dyn dbus::arg::RefArg>>> = HashMap::new();
+                m.insert(
+                    "address".to_string(),
+                    Variant(Box::new(ip_address.to_string())),
+                );
+
+                let prefix: u32 = subnet_mask
+                    .octets()
+                    .into_iter()
+                    .map(|o| o.count_ones())
+                    .sum();
+                m.insert("prefix".to_string(), Variant(Box::new(prefix)));
+                m
+            }];
+            ipv4.insert("address-data".to_owned(), Variant(Box::new(addr_data)));
+
+            ipv4.insert(
+                "gateway".to_owned(),
+                Variant(Box::new(gateway_address.to_string())),
+            );
+        }
+        map.insert("ipv4", ipv4);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ipv6Method {
+    Shared,
+    Auto,
+    Disabled,
+}
+
+impl Ipv6Method {
+    fn to_nm_method(&self) -> &'static str {
+        match self {
+            Ipv6Method::Shared => "shared",
+            Ipv6Method::Auto => "auto",
+            Ipv6Method::Disabled => "disabled",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ipv6Settings {
+    pub method: Ipv6Method,
+}
+
+impl Ipv6Settings {
+    fn insert_properties(&self, map: &mut HashMap<&str, PropMap>) {
+        let mut ipv6 = PropMap::new();
+        ipv6.insert(
+            "method".to_owned(),
+            Variant(Box::new(self.method.to_nm_method().to_owned())),
+        );
+        map.insert("ipv6", ipv6);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectionSettings {
+    pub id: String,
+    pub uuid: Uuid,
+    pub autoconnect: bool,
+    pub interface_name: Option<String>,
+    pub connection_type: ConnectionTypeConfig,
+    pub ipv4_settings: Option<Ipv4Settings>,
+    pub ipv6_settings: Option<Ipv6Settings>,
+}
+
+impl ConnectionSettings {
+    fn to_props(&self) -> HashMap<&str, PropMap> {
+        let mut map = HashMap::new();
+        let mut connection = PropMap::new();
+        connection.insert("id".to_owned(), Variant(Box::new(self.id.to_owned())));
+        connection.insert("uuid".to_owned(), Variant(Box::new(self.uuid.to_string())));
+        if let Some(interface_name) = &self.interface_name {
+            connection.insert(
+                "interface-name".to_owned(),
+                Variant(Box::new(interface_name.to_owned())),
+            );
+        }
+
+        let nm_type = self.connection_type.to_nm_type();
+        connection.insert("type".to_owned(), Variant(Box::new(nm_type.to_owned())));
+        connection.insert(
+            "autoconnect".to_owned(),
+            Variant(Box::new(self.autoconnect)),
+        );
+        map.insert("connection", connection);
+
+        self.connection_type.insert_properties(&mut map);
+        if let Some(ipv4_settings) = &self.ipv4_settings {
+            ipv4_settings.insert_properties(&mut map);
+        }
+
+        if let Some(ipv6_settings) = &self.ipv6_settings {
+            ipv6_settings.insert_properties(&mut map);
+        }
+        map
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectionRef<'a> {
+    path: dbus::Path<'a>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActiveConnectionRef<'a> {
+    path: dbus::Path<'a>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionState {
+    Unknown = 0,
+    Activating = 1,
+    Activated = 2,
+    Deactivating = 3,
+    Deactivated = 4,
+}
+
+impl TryFrom<u32> for ConnectionState {
+    type Error = anyhow::Error;
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => ConnectionState::Unknown,
+            1 => ConnectionState::Activating,
+            2 => ConnectionState::Activated,
+            3 => ConnectionState::Deactivating,
+            4 => ConnectionState::Deactivated,
+            _ => {
+                anyhow::bail!("Unknown value for ConnectionState({value})");
+            }
+        })
+    }
+}

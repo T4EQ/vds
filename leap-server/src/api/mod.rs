@@ -37,10 +37,10 @@ pub struct ProvisionApiData {
 }
 
 impl ProvisionApiData {
-    pub fn new() -> Self {
-        Self {
-            provision: DynProvision::new(),
-        }
+    pub async fn new() -> anyhow::Result<Self> {
+        Ok(Self {
+            provision: DynProvision::new().await?,
+        })
     }
 }
 
