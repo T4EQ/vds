@@ -30,7 +30,7 @@ struct Args {
 }
 
 fn default_config_path() -> PathBuf {
-    "/var/lib/leap/config/config.toml".into()
+    leap_server::cfg::DEFAULT_CONFIG_PATH.into()
 }
 
 fn print_version_info() {

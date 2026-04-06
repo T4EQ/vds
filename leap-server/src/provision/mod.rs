@@ -8,6 +8,11 @@ mod cfg;
 mod network;
 mod storage;
 
+const MOUNT_PATH: &str = "/var/lib/leap";
+const RUNTIME_PATH: &str = "/var/lib/leap/runtime_path";
+const CONTENT_PATH: &str = "/var/lib/leap/content_path";
+const PROVISION_FILE_PATH: &str = "/var/lib/leap/provision.json";
+
 pub use storage::{BlockDevice, BlockDeviceType};
 
 #[derive(Debug)]
@@ -131,11 +136,8 @@ impl Provision<LeapConfigStep> {
 
 impl Provision<CompleteStep> {
     pub async fn finish(self) -> anyhow::Result<()> {
-        tokio::fs::write(
-            "/var/lib/leap/provision.json",
-            &serde_json::to_vec(&self.inner)?,
-        )
-        .await?;
+        // Save a record of the provisioning process
+        tokio::fs::write(PROVISION_FILE_PATH, &serde_json::to_vec(&self.inner)?).await?;
 
         // Try to guarantee that outstandring writes are completed and flushed to disk
         nix::unistd::sync();

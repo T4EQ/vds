@@ -4,6 +4,8 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
+use crate::provision::MOUNT_PATH;
+
 fn default_children_node() -> Vec<BlockDevice> {
     vec![]
 }
@@ -133,7 +135,7 @@ pub async fn prepare_storage_medium(path: &Path) -> anyhow::Result<()> {
     tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
         nix::mount::mount(
             Some(&path),
-            "/var/lib/leap",
+            MOUNT_PATH,
             Some("ext4"),
             nix::mount::MsFlags::MS_NOATIME,
             Option::<&str>::None,

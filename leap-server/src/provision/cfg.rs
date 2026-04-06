@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use crate::cfg::{DbConfig, DownloaderConfig, LeapConfig, RetryParams, S3Config};
+use super::{CONTENT_PATH, MOUNT_PATH, RUNTIME_PATH};
+use crate::cfg::{
+    DEFAULT_CONFIG_PATH, DbConfig, DownloaderConfig, LeapConfig, RetryParams, S3Config,
+};
 
 impl From<&leap_api::provision::config::post::LeapConfig> for LeapConfig {
     fn from(value: &leap_api::provision::config::post::LeapConfig) -> Self {
@@ -8,9 +11,10 @@ impl From<&leap_api::provision::config::post::LeapConfig> for LeapConfig {
         Self {
             debug: false,
             db_config: DbConfig {
+                // These parameters are not considered to be user-configurable.
                 busy_timeout: Duration::from_secs(10),
                 pool_size: 16,
-                runtime_path: "/var/lib/leap/runtime_path".into(),
+                runtime_path: RUNTIME_PATH.into(),
             },
             s3_config: S3Config {
                 endpoint_url: value.s3_config.endpoint_url.clone(),
@@ -31,7 +35,7 @@ impl From<&leap_api::provision::config::post::LeapConfig> for LeapConfig {
                 concurrent_downloads: value.downloader_config.concurrent_downloads,
                 remote_server: value.s3_config.bucket.clone(),
                 update_interval: value.downloader_config.update_interval,
-                content_path: "/var/lib/leap/content_path".into(),
+                content_path: CONTENT_PATH.into(),
                 retry_params: RetryParams {
                     initial_backoff: value.downloader_config.retry_params.initial_backoff,
                     backoff_factor: value.downloader_config.retry_params.backoff_factor,
@@ -76,10 +80,10 @@ pub async fn provision_configuration(
     let blockdevs = super::storage::list_blockdevs().await?;
     let mounted = blockdevs
         .iter()
-        .any(|b| b.mountpoints.contains(&"/var/lib/leap".to_owned()));
+        .any(|b| b.mountpoints.contains(&MOUNT_PATH.to_owned()));
     if !mounted {
-        tracing::error!("Block device is not mounted at /var/lib/leap");
-        anyhow::bail!("Cannot apply configuration. /var/lib/leap is not mounted");
+        tracing::error!("Block device is not mounted at {MOUNT_PATH}");
+        anyhow::bail!("Cannot apply configuration. {MOUNT_PATH} is not mounted");
     }
     tracing::info!("Block device is mounted");
 
@@ -123,7 +127,7 @@ pub async fn provision_configuration(
 
     // Save configuration to file
     tracing::info!("Saving configuration to file");
-    let target_dir: std::path::PathBuf = "/var/lib/leap/config/config.toml".into();
+    let target_dir: std::path::PathBuf = DEFAULT_CONFIG_PATH.into();
     if let Some(parent) = target_dir.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
