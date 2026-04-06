@@ -246,7 +246,7 @@ where
     .await??;
 
     tracing::info!("Leap network is enabled.");
-    action().await?;
+    let action_result = action().await;
     tracing::info!("Completed action requiring network connectivity.");
 
     tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
@@ -258,5 +258,6 @@ where
         Ok(())
     })
     .await??;
-    Ok(())
+
+    action_result
 }
