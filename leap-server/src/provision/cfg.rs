@@ -42,6 +42,33 @@ impl From<&leap_api::provision::config::post::LeapConfig> for LeapConfig {
     }
 }
 
+async fn check_timesync() -> anyhow::Result<bool> {
+    let output = tokio::process::Command::new("timedatectl")
+        .arg("show")
+        .arg("-P")
+        .arg("NTPSynchronized")
+        .output()
+        .await?;
+    if !output.status.success() || output.status.code() != Some(0) {
+        tracing::error!("Failure checking time synchronization {output:?}");
+        anyhow::bail!("Failure checking time synchronization {output:?}");
+    }
+
+    Ok(output.stdout == b"yes\n")
+}
+
+async fn wait_timesync(timeout: std::time::Duration) -> anyhow::Result<()> {
+    let start = std::time::Instant::now();
+    while std::time::Instant::now() - start < timeout {
+        if check_timesync().await? {
+            return Ok(());
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    anyhow::bail!("Timeout while waiting for time synchronization");
+}
+
 pub async fn provision_configuration(
     config: &leap_api::provision::config::post::LeapConfig,
 ) -> anyhow::Result<LeapConfig> {
@@ -58,33 +85,41 @@ pub async fn provision_configuration(
 
     let config: LeapConfig = config.into();
 
-    // FIXME: There seems to be an issue here that triggers a segfault in AWS code... Can't really
-    // tell what it is at this point.
-    //
     // Check S3 access to validate configuration. For this, we need to temporarily enable the
     // network setup and then come back to the original setup network.
-    // {
-    //     let config = config.clone();
-    //     super::network::temporarily_enable_network_config(async move || -> anyhow::Result<()> {
-    //         let bucket = config
-    //             .downloader_config
-    //             .remote_server
-    //             .host()
-    //             .ok_or_else(|| {
-    //                 tracing::error!("Invalid S3 URI");
-    //                 anyhow::anyhow!("S3 URI must specify a bucket name")
-    //             })?;
-    //         tracing::info!("Checking access to bucket.");
-    //         let s3_backend =
-    //             crate::downloader::s3backend::S3Backend::new(bucket, &config.s3_config).await?;
-    //         s3_backend.verify_bucket_access().await.inspect_err(|e| {
-    //             tracing::error!("Bucket access failed: {e}");
-    //         })?;
-    //         tracing::info!("Bucket access Ok");
-    //         Ok(())
-    //     })
-    //     .await?;
-    // }
+    {
+        let config = config.clone();
+        super::network::temporarily_enable_network_config(async move || -> anyhow::Result<()> {
+            // Wait for time sync, since HTTPs certs for S3 require our time to be somewhat close
+            // to the reality, and we do not have an RTC on the board.
+            tracing::info!("Waiting for time sync");
+            const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+            // This is a best-effort synchronization. It might be that date was previously
+            // synchronized, so we try to connect to S3 either way.
+            let _ = wait_timesync(TIMEOUT)
+                .await
+                .inspect(|_| tracing::info!("Time synchronized"))
+                .inspect_err(|e| tracing::error!("Time synchronization failed: {e:?}"));
+
+            let bucket = config
+                .downloader_config
+                .remote_server
+                .host()
+                .ok_or_else(|| {
+                    tracing::error!("Invalid S3 URI");
+                    anyhow::anyhow!("S3 URI must specify a bucket name")
+                })?;
+            tracing::info!("Checking access to bucket.");
+            let s3_backend =
+                crate::downloader::s3backend::S3Backend::new(bucket, &config.s3_config).await?;
+            s3_backend.verify_bucket_access().await.inspect_err(|e| {
+                tracing::error!("Bucket access failed: {e}");
+            })?;
+            tracing::info!("Bucket access Ok");
+            Ok(())
+        })
+        .await?;
+    }
 
     // Save configuration to file
     tracing::info!("Saving configuration to file");
