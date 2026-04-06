@@ -13,10 +13,10 @@ use yew_router::prelude::*;
 pub enum Route {
     #[at("/")]
     Start,
-    #[at("/network")]
-    NetworkConfig,
     #[at("/storage")]
     StorageConfig,
+    #[at("/network")]
+    NetworkConfig,
     #[at("/leap-config")]
     LeapConfig,
     #[at("/completed")]
@@ -26,8 +26,8 @@ pub enum Route {
 impl From<ProvisionStatus> for Route {
     fn from(value: ProvisionStatus) -> Self {
         match value {
-            ProvisionStatus::NetworkConfig => Route::NetworkConfig,
             ProvisionStatus::StorageConfig => Route::StorageConfig,
+            ProvisionStatus::NetworkConfig => Route::NetworkConfig,
             ProvisionStatus::LeapConfig => Route::LeapConfig,
             ProvisionStatus::Completed => Route::Completed,
         }
@@ -64,10 +64,10 @@ pub fn use_provision_redirect(current: Route) {
 
 #[function_component(StartPage)]
 pub fn start_page() -> Html {
-    use_provision_redirect(Route::NetworkConfig);
+    use_provision_redirect(Route::StorageConfig);
 
     let navigator = use_navigator().unwrap();
-    let on_start = Callback::from(move |_| navigator.replace(&Route::NetworkConfig));
+    let on_start = Callback::from(move |_| navigator.replace(&Route::StorageConfig));
 
     html! {
         <div class="start-page">
@@ -81,8 +81,8 @@ pub fn start_page() -> Html {
 fn switch(route: Route) -> Html {
     match route {
         Route::Start => html! { <StartPage /> },
-        Route::NetworkConfig => html! { <NetworkConfigPage /> },
         Route::StorageConfig => html! { <StorageConfigPage /> },
+        Route::NetworkConfig => html! { <NetworkConfigPage /> },
         Route::LeapConfig => html! { <LeapConfigPage /> },
         Route::Completed => html! { <CompletedPage /> },
     }
