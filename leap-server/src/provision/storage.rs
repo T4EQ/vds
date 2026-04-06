@@ -1,3 +1,10 @@
+//! This module takes care of the configuration of the storage device used by LEAP.
+//!
+//! Public functions:
+//!  - [`list_blockdevs`] returns a list of block devices currently attached to the system.
+//!  - [`prepare_storage_medium`] formats the requested block device as ext4 and makes sure it is
+//!    mounted.
+
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
@@ -48,6 +55,9 @@ pub struct LsblkOutput {
     blockdevices: Vec<BlockDevice>,
 }
 
+/// Lists all available block devices in the system. Note that block devices may have children.
+/// Only disks are present at the root of the hierarchy.
+/// Skips internal disks or ephimeral disks like zram, ram, and loop devs.
 pub async fn list_blockdevs() -> anyhow::Result<Vec<BlockDevice>> {
     let result = Command::new("lsblk")
         .arg("--json")
@@ -100,6 +110,7 @@ async fn unmount_block_dev(block_dev: &BlockDevice) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Formats the given storage device at `path` as ext4 and makes sure that it is mounted.
 pub async fn prepare_storage_medium(path: &Path) -> anyhow::Result<()> {
     let all_block_devs = list_blockdevs().await?;
 
@@ -117,6 +128,8 @@ pub async fn prepare_storage_medium(path: &Path) -> anyhow::Result<()> {
     // Create filesystem
     let mke2fs_result = tokio::process::Command::new("mke2fs")
         .arg("-L")
+        // Note that this label is used by the systemd var-lib-leap.mount to know which device to
+        // mount to /var/lib/leap. Do NOT change it.
         .arg("LEAP_DATA")
         .arg("-t")
         .arg("ext4")
@@ -124,12 +137,12 @@ pub async fn prepare_storage_medium(path: &Path) -> anyhow::Result<()> {
         .output()
         .await?;
     if !mke2fs_result.status.success() || mke2fs_result.status.code() != Some(0) {
-        tracing::error!("Failure creating ext4 fs {mke2fs_result:?}");
+        tracing::error!("Failure creating ext4 fs: {mke2fs_result:?}");
         anyhow::bail!("Failure to format storage {mke2fs_result:?}");
     }
 
-    tracing::info!("ext4 fs created");
-    tracing::info!("mounting file system");
+    tracing::info!("Ext4 fs created");
+    tracing::info!("Mounting file system");
 
     let path = path.to_owned();
     tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
@@ -144,6 +157,6 @@ pub async fn prepare_storage_medium(path: &Path) -> anyhow::Result<()> {
     })
     .await??;
 
-    tracing::info!("file system mounted");
+    tracing::info!("File system mounted");
     Ok(())
 }
