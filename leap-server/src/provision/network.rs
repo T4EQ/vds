@@ -1,4 +1,27 @@
+//! Utilities to perform network provisioning with a custom hotspot (the LEAP-setup network)
+//! that provides an initial network for configuration with a DHCP server autoconfigured.
 //!
+//! This module makes heavy use of NetworkManager interfaces via D-BUS. The D-BUS-specific code is
+//! in a separate `dbus` module, which helps to isolate purely infrastructure code from provision
+//! logic implemented in this module.
+//!
+//! The following public functions are provided:
+//! - [`start_provision_network`] creates the `LEAP-setup` network. Note that this network is not
+//!   saved to disk, which ensures that the provision network is not persistently stored and
+//!   activated by mistake, as it can only be activated after boot by the `leap-server` binary.
+//!
+//! - [`test_and_create_network_config`] receives a network configuration from the HTTP server,
+//!   which then uses to create a new network configuration in NetworkManager and test it. This
+//!   function disables the `LEAP-setup` network temporarily while testing the new connection. Iff
+//!   the new connection gets to the connected state within 30 seconds after requested, then the
+//!   network configuration is valid and the configuration is persisted to disk. Before this
+//!   function exits, it re-enables the `LEAP-setup` network so that the rest of the provisioning
+//!   process can continue.
+//!
+//! - [`temporarily_enable_network_config`] allows to run a specific chunk of code with the target
+//!   network configuration. This might be used by later steps of the provisioning process to ensure
+//!   that, e.g. credentials to the content server are correct. Re-activates the `LEAP-setup`
+//!   connection upon exit.
 
 use anyhow::Context;
 use secrecy::ExposeSecret;
@@ -43,8 +66,8 @@ impl From<&leap_api::types::IpConfig> for dbus::Ipv4Settings {
                 ip_address,
                 net_mask,
                 gateway,
-                // FIXME: Make use or remove
-                dns,
+                // FIXME: Make use of dns or remove
+                dns: _,
             }) => Self {
                 method: dbus::Ipv4Method::Manual {
                     ip_address: *ip_address,
@@ -113,6 +136,8 @@ fn start_provision_network_impl(
     Ok(())
 }
 
+/// Creates the `LEAP-setup` provisioning WiFi network. This connection is not persisted to disk,
+/// but the connection is immediately activated.
 pub async fn start_provision_network() -> anyhow::Result<()> {
     tokio::task::spawn_blocking(|| -> anyhow::Result<()> {
         let nm = dbus::NetworkManager::new()?;
@@ -125,6 +150,8 @@ pub async fn start_provision_network() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Tests the provided network configuration by activating the network. If successful, it saves the
+/// connection to disk. When the function exits, it re-enables the `LEAP-setup` network.
 pub async fn test_and_create_network_config(
     network_config: &leap_api::types::NetworkConfig,
 ) -> anyhow::Result<()> {
@@ -188,6 +215,8 @@ pub async fn test_and_create_network_config(
     Ok(())
 }
 
+/// Runs the `action` with the target network configuration activated. Re-activates the `LEAP-setup`
+/// connection upon exit.
 pub async fn temporarily_enable_network_config<T, U>(action: T) -> anyhow::Result<()>
 where
     T: FnOnce() -> U,
