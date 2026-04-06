@@ -136,6 +136,12 @@ impl Provision<CompleteStep> {
             &serde_json::to_vec(&self.inner)?,
         )
         .await?;
+
+        // Try to guarantee that outstandring writes are completed and flushed to disk
+        nix::unistd::sync();
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        nix::unistd::sync();
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         loop {
             nix::sys::reboot::reboot(nix::sys::reboot::RebootMode::RB_AUTOBOOT)?;
         }
