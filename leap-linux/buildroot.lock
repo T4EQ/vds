@@ -197,6 +197,15 @@
       "https://sources.buildroot.net/e2fsprogs-1.47.3.tar.xz"
     ]
   },
+  "e2tools-0.1.2.tar.gz": {
+    "algo": "sha256",
+    "checksum": "b19593bbfc85e9c14c0d2bc8525887901c8fe02588c76df60ab843bf0573c4a2",
+    "uris": [
+      "https://github.com/e2tools/e2tools/releases/download/v0.1.2/e2tools-0.1.2.tar.gz",
+      "https://sources.buildroot.net/e2tools/e2tools-0.1.2.tar.gz",
+      "https://sources.buildroot.net/e2tools-0.1.2.tar.gz"
+    ]
+  },
   "expat-2.7.4.tar.xz": {
     "algo": "sha256",
     "checksum": "9e9cabb457c1e09de91db2706d8365645792638eb3be1f94dbb2149301086ac0",
