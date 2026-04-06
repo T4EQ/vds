@@ -56,7 +56,7 @@ pub async fn init_logging(logfile: Option<&Path>, debug: bool) {
 }
 
 pub async fn run_provisioning(listener: TcpListener) -> anyhow::Result<()> {
-    let app_data = web::Data::new(Mutex::new(ProvisionApiData::new()));
+    let app_data = web::Data::new(Mutex::new(ProvisionApiData::new().await?));
     let server = HttpServer::new(move || {
         App::new()
             .app_data(app_data.clone())

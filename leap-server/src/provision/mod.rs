@@ -48,11 +48,12 @@ pub struct Provision<Step: ProvisionStep> {
 }
 
 impl<S: ProvisionStep> Provision<S> {
-    /// Constructs the Provision in its default state
-    pub const fn new() -> Provision<StorageStep> {
-        Provision {
+    /// Constructs the Provision in its default state. Initialize the network for provisioning
+    pub async fn new() -> anyhow::Result<Provision<StorageStep>> {
+        network::start_provision_network().await?;
+        Ok(Provision {
             inner: StorageStep {},
-        }
+        })
     }
 
     /// Listing the block devices can be done at any step
@@ -90,13 +91,15 @@ impl Provision<NetworkStep> {
         self,
         network_config: &NetworkConfig,
     ) -> Result<Provision<LeapConfigStep>, (anyhow::Error, Provision<NetworkStep>)> {
-        // TODO: this is not yet implemented
-        Ok(Provision {
-            inner: LeapConfigStep {
-                storage_node: self.inner.storage_node,
-                network_config: network_config.clone(),
-            },
-        })
+        match network::test_and_create_network_config(network_config).await {
+            Ok(()) => Ok(Provision {
+                inner: LeapConfigStep {
+                    storage_node: self.inner.storage_node,
+                    network_config: network_config.clone(),
+                },
+            }),
+            Err(err) => Err((err, self)),
+        }
     }
 }
 
@@ -152,6 +155,7 @@ enum DynProvisionImpl {
 
 trait ProvisionVariant: ProvisionStep + Sized {
     const CONSTRUCTOR: fn(Provision<Self>) -> DynProvisionImpl;
+    const NAME: &str;
 }
 
 impl<S> From<Provision<S>> for DynProvisionImpl
@@ -165,27 +169,31 @@ where
 
 impl ProvisionVariant for NetworkStep {
     const CONSTRUCTOR: fn(Provision<Self>) -> DynProvisionImpl = DynProvisionImpl::Network;
+    const NAME: &str = "NetworkStep";
 }
 
 impl ProvisionVariant for StorageStep {
     const CONSTRUCTOR: fn(Provision<Self>) -> DynProvisionImpl = DynProvisionImpl::Storage;
+    const NAME: &str = "StorageStep";
 }
 
 impl ProvisionVariant for LeapConfigStep {
     const CONSTRUCTOR: fn(Provision<Self>) -> DynProvisionImpl = DynProvisionImpl::LeapConfig;
+    const NAME: &str = "LeapConfigStep";
 }
 
 impl ProvisionVariant for CompleteStep {
     const CONSTRUCTOR: fn(Provision<Self>) -> DynProvisionImpl = DynProvisionImpl::Complete;
+    const NAME: &str = "CompleteStep";
 }
 
 pub struct DynProvision(Option<DynProvisionImpl>);
 
 impl DynProvision {
-    pub const fn new() -> Self {
-        DynProvision(Some(DynProvisionImpl::Storage(
-            Provision::<StorageStep>::new(),
-        )))
+    pub async fn new() -> anyhow::Result<Self> {
+        Ok(DynProvision(Some(DynProvisionImpl::Storage(
+            Provision::<StorageStep>::new().await?,
+        ))))
     }
 
     /// Listing the block devices can be done at any step
@@ -295,10 +303,17 @@ impl DynProvision {
     ) -> anyhow::Result<()> {
         match result {
             Ok(dst) => {
+                tracing::info!("Successful transition from {} to {}", Src::NAME, Dst::NAME);
                 self.0.replace(DynProvisionImpl::from(dst));
                 Ok(())
             }
             Err((err, src)) => {
+                tracing::info!(
+                    "Failed to transition from {} to {}. Staying in {}",
+                    Src::NAME,
+                    Dst::NAME,
+                    Src::NAME
+                );
                 self.0.replace(DynProvisionImpl::from(src));
                 Err(err)
             }
