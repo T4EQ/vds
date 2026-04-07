@@ -7,7 +7,7 @@ top@{ inputs, ... }:
       # toolchains from the rust-toolchain.toml files would take way too long. Maybe we could
       # do this if we setup a nix cache, but for now this will do.
       leapPackageWithPkgs =
-        pkgs: targetPkgs:
+        pkgs: targetPkgs: opts:
         targetPkgs.rustPlatform.buildRustPackage {
           pname = "leap-server";
           version = "0.1.0";
@@ -30,7 +30,7 @@ top@{ inputs, ... }:
             export LEAP_SERVER_NIX_GIT_REVISION="${top.config.git-rev}"
             # GCC compiles by default with -moutline-atomics, but this is not supported by the musl
             # variant of the build, as it would require linking to libgcc. This is needed by libdbus.
-            export CFLAGS="$CFLAGS -mno-outline-atomics"
+            export CFLAGS="$CFLAGS ${opts.extra-cflags or ""}"
             cargo build --release --offline -j $NIX_BUILD_CORES --target ${targetPkgs.stdenv.hostPlatform.rust.rustcTarget} --no-default-features
             popd
             runHook postBuild
@@ -47,8 +47,8 @@ top@{ inputs, ... }:
     in
     {
       packages = {
-        leap = leapPackageWithPkgs pkgs pkgs;
-        leap-target = leapPackageWithPkgs pkgs targetPkgs;
+        leap = leapPackageWithPkgs pkgs pkgs {};
+        leap-target = leapPackageWithPkgs pkgs targetPkgs { extra-cflags = "-mno-outline-atomics"; };
       };
     };
 }
