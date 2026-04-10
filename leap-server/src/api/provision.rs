@@ -72,7 +72,7 @@ async fn format_storage(
 ) -> impl Responder {
     match provision_data.try_lock() {
         Ok(mut lock) => match lock.provision.configure_storage(&name).await {
-            Ok(blockdevs) => HttpResponse::Ok().json(blockdevs),
+            Ok(()) => HttpResponse::Ok().body(""),
             Err(err) => HttpResponse::InternalServerError().body(format!("{err}")),
         },
         Err(_) => HttpResponse::BadRequest().body("Another provisioning operation is ongoing"),

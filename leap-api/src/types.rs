@@ -113,7 +113,7 @@ pub struct RetryParams {
     pub initial_backoff: std::time::Duration,
 
     /// The adjustement factor for the backoff after a failure. Must be larger than 1 so that
-    /// the backoff actually increments exponentially
+    /// the backoff actually grows exponentially
     pub backoff_factor: f64,
 
     /// The maximum backoff time after a download failure.
@@ -134,8 +134,7 @@ pub struct DownloaderConfig {
     pub retry_params: RetryParams,
 }
 
-/// Configuration to access the S3 server. Note the bucket is handled separately in the main
-/// configuration.
+/// Configuration to access the S3 server.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct S3Config {
     /// URI of the bucket
