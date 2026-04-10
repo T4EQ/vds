@@ -66,8 +66,6 @@ impl From<&leap_api::types::IpConfig> for dbus::Ipv4Settings {
                 ip_address,
                 net_mask,
                 gateway,
-                // FIXME: Make use of dns or remove
-                dns: _,
             }) => Self {
                 method: dbus::Ipv4Method::Manual {
                     ip_address: *ip_address,
