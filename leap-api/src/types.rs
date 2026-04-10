@@ -177,7 +177,6 @@ pub struct StaticIpConfig {
     pub ip_address: Ipv4Addr,
     pub net_mask: Ipv4Addr,
     pub gateway: Ipv4Addr,
-    pub dns: Vec<Ipv4Addr>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
