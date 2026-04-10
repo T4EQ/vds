@@ -259,7 +259,7 @@ impl TryFrom<&str> for ConnectionType {
             "802-3-ethernet" => Self::Wired,
             "802-11-wireless" => Self::Wireless,
             _ => {
-                anyhow::bail!("Invlaid connection type: {value:?}");
+                anyhow::bail!("Invalid connection type: {value:?}");
             }
         })
     }

@@ -157,7 +157,10 @@ impl Provision<CompleteStep> {
         // Save a record of the provisioning process
         tokio::fs::write(PROVISION_FILE_PATH, &serde_json::to_vec(&self.inner)?).await?;
 
-        // Try to guarantee that outstandring writes are completed and flushed to disk
+        // Try to guarantee that outstandring writes are completed and flushed to disk. Note that
+        // posix specifies that `sync` schedules the writes, but does not wait for them. Linux
+        // manpages, however, suggest that the I/O is done synchronously. Two syncs are kept just
+        // to be on the safe side.
         nix::unistd::sync();
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         nix::unistd::sync();

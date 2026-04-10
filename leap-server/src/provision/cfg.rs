@@ -56,7 +56,7 @@ async fn check_timesync() -> anyhow::Result<bool> {
         .arg("NTPSynchronized")
         .output()
         .await?;
-    if !output.status.success() || output.status.code() != Some(0) {
+    if !output.status.success() {
         tracing::error!("Failure checking time synchronization {output:?}");
         anyhow::bail!("Failure checking time synchronization {output:?}");
     }

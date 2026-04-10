@@ -165,19 +165,15 @@ pub async fn test_and_create_network_config(
         }
 
         let devs = nm.list_devices()?;
-        let wireless_dev = devs
-            .iter()
-            .find(|d| d.dev_type == DeviceType::Wifi)
-            .context("Unable to find Wireless Device!")?;
-        let wired_dev = devs
-            .iter()
-            .find(|d| d.dev_type == DeviceType::Ethernet)
-            .context("Unable to find Wired Device!")?;
 
         let device = if network_config.is_wired() {
-            wired_dev
+            devs.iter()
+                .find(|d| d.dev_type == DeviceType::Ethernet)
+                .context("Unable to find Wired Device!")?
         } else {
-            wireless_dev
+            devs.iter()
+                .find(|d| d.dev_type == DeviceType::Wifi)
+                .context("Unable to find Wireless Device!")?
         };
 
         let config = ConnectionSettings::from_network_config(device, &network_config);
