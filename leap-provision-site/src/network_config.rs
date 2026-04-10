@@ -155,7 +155,6 @@ pub fn network_config_page() -> Html {
                             ip_address: ip,
                             net_mask: nm,
                             gateway: gw,
-                            dns: vec![],
                         })
                     }
                 };
