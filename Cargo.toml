@@ -10,48 +10,48 @@ members = [
 
 [workspace.dependencies]
 actix-web = "4"
-actix-web-static-files = "4.0"
+actix-web-static-files = { version = "4.1", features = ["static-files-03"] }
 anyhow = "1.0"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
 aws-config = "1.8.15"
-aws-sdk-s3 = "1.127.0"
+aws-sdk-s3 = "1.129.0"
 built = "0.8.0"
 chrono = { version = "0.4", features = ["serde"] }
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 config = "0.15"
 dbus = { version = "0.9.10", features = ["vendored"] }
 deadpool-diesel = { version = "0.6.1", features = ["sqlite"] }
-diesel = { version = "2.3.0", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
+diesel = { version = "2.3.7", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
 diesel_migrations = "2.3.1"
-gloo-net = "0.2"
+gloo-net = "0.7"
 googletest = "0.14"
-http = "0.2"
+http = "1.4"
 humantime-serde = "1.1.1"
-libsqlite3-sys = { version = "0.29", features = ["bundled"] }
+libsqlite3-sys = { version = "0.36", features = ["bundled"] }
 log = "0.4"
 nix = { version = "0.31.2", features = ["mount", "reboot", "fs"] }
-regex = "1.12.2"
-reqwest = { version = "0.12", features = ["blocking", "json"] }
+regex = "1.12.3"
+reqwest = { version = "0.13", features = ["blocking", "json"] }
 secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sha2 = "0.10.9"
-static-files = "0.2.1"
-tempfile = "3.24"
-thiserror = "2.0.17"
-tokio = { version = "1.47", features = ["full"] }
+sha2 = "0.11.0"
+static-files = "0.3.1"
+tempfile = "3.27"
+thiserror = "2.0.18"
+tokio = { version = "1.51", features = ["full"] }
 tokio-stream = "0.1.18"
-toml = "1.1.0"
+toml = "1.1.2"
 tracing = "0.1.44"
 tracing-actix-web = "0.7.21"
 tracing-bunyan-formatter = "0.3.10"
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-uuid = { version = "1.18", features = ["serde", "v4"] }
-wasm-bindgen = "=0.2.106" # This pins a specific version of wasm-bindgen that needs to match the version of wasm-bindgen-cli in the nix flake.
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+uuid = { version = "1.23", features = ["serde", "v4"] }
+wasm-bindgen = "=0.2.114" # This pins a specific version of wasm-bindgen that needs to match the version of wasm-bindgen-cli in the nix flake.
 wasm-bindgen-futures = "0.4"
 wasm-logger = "0.2"
 web-sys = "0.3"
 xshell = "0.2.7"
-yew = { version = "=0.22.0", features = ["csr"] }
-yew-router = "0.19"
+yew = { version = "0.23.0", features = ["csr"] }
+yew-router = "0.20"
