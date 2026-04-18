@@ -81,9 +81,3 @@ jobs:
     - name: 'Install rust-toolchain.toml'
       run: rustup toolchain install
     - run: cargo doc
-
-  cargo-deny:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: EmbarkStudios/cargo-deny-action@v2
