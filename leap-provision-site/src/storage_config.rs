@@ -1,4 +1,4 @@
-use crate::app::{use_provision_redirect, Route};
+use crate::app::{Route, use_provision_redirect};
 use gloo_net::http::Request;
 use leap_api::provision::storage::devices::get::BlockDevice;
 use wasm_bindgen_futures::spawn_local;
@@ -132,9 +132,7 @@ pub fn storage_config_page() -> Html {
                 }
 
                 if let Ok(status_resp) = Request::get("/provision/status").send().await
-                    && let Ok(status) = status_resp
-                        .json::<leap_api::types::ProvisionStatus>()
-                        .await
+                    && let Ok(status) = status_resp.json::<leap_api::types::ProvisionStatus>().await
                 {
                     navigator.replace(&Route::from(status));
                 }

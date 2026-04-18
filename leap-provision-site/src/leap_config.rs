@@ -1,4 +1,4 @@
-use crate::app::{use_provision_redirect, Route};
+use crate::app::{Route, use_provision_redirect};
 use gloo_net::http::Request;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
@@ -84,7 +84,9 @@ pub fn leap_config_page() -> Html {
             let concurrent_downloads_num = match concurrent_downloads_val.parse::<usize>() {
                 Ok(n) if n > 0 => n,
                 _ => {
-                    toast.set(Some("Concurrent downloads must be a positive integer".to_string()));
+                    toast.set(Some(
+                        "Concurrent downloads must be a positive integer".to_string(),
+                    ));
                     return;
                 }
             };
@@ -92,7 +94,9 @@ pub fn leap_config_page() -> Html {
             let backoff_factor_num = match backoff_factor_val.parse::<f64>() {
                 Ok(f) if f > 1.0 => f,
                 _ => {
-                    toast.set(Some("Backoff factor must be a number greater than 1".to_string()));
+                    toast.set(Some(
+                        "Backoff factor must be a number greater than 1".to_string(),
+                    ));
                     return;
                 }
             };
@@ -115,10 +119,16 @@ pub fn leap_config_page() -> Html {
             } else {
                 Some(endpoint_url_val)
             };
-            let force_path_style_opt: Option<bool> =
-                if force_path_style_val { Some(true) } else { None };
-            let region_opt: Option<String> =
-                if region_val.is_empty() { None } else { Some(region_val) };
+            let force_path_style_opt: Option<bool> = if force_path_style_val {
+                Some(true)
+            } else {
+                None
+            };
+            let region_opt: Option<String> = if region_val.is_empty() {
+                None
+            } else {
+                Some(region_val)
+            };
 
             let config = serde_json::json!({
                 "downloader_config": {
@@ -173,8 +183,7 @@ pub fn leap_config_page() -> Html {
                 }
 
                 if let Ok(status_resp) = Request::get("/provision/status").send().await
-                    && let Ok(status) =
-                        status_resp.json::<leap_api::types::ProvisionStatus>().await
+                    && let Ok(status) = status_resp.json::<leap_api::types::ProvisionStatus>().await
                 {
                     navigator.replace(&Route::from(status));
                 }
