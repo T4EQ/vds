@@ -1,4 +1,7 @@
-use crate::app::{Route, use_provision_redirect};
+use crate::{
+    app::{Route, use_provision_redirect},
+    oninput,
+};
 use gloo_net::http::Request;
 use leap_api::types::{IpConfig, NetworkConfig, StaticIpConfig, WiredConfig, WirelessConfig};
 use secrecy::SecretString;
@@ -54,41 +57,6 @@ pub fn network_config_page() -> Html {
                 "static" => IpMode::Static,
                 _ => IpMode::Dhcp,
             });
-        })
-    };
-
-    let on_ssid_input = {
-        let ssid = ssid.clone();
-        Callback::from(move |e: InputEvent| {
-            ssid.set(e.target_unchecked_into::<HtmlInputElement>().value());
-        })
-    };
-
-    let on_password_input = {
-        let password = password.clone();
-        Callback::from(move |e: InputEvent| {
-            password.set(e.target_unchecked_into::<HtmlInputElement>().value());
-        })
-    };
-
-    let on_ip_address_input = {
-        let ip_address = ip_address.clone();
-        Callback::from(move |e: InputEvent| {
-            ip_address.set(e.target_unchecked_into::<HtmlInputElement>().value());
-        })
-    };
-
-    let on_gateway_input = {
-        let gateway = gateway.clone();
-        Callback::from(move |e: InputEvent| {
-            gateway.set(e.target_unchecked_into::<HtmlInputElement>().value());
-        })
-    };
-
-    let on_net_mask_input = {
-        let net_mask = net_mask.clone();
-        Callback::from(move |e: InputEvent| {
-            net_mask.set(e.target_unchecked_into::<HtmlInputElement>().value());
         })
     };
 
@@ -177,8 +145,22 @@ pub fn network_config_page() -> Html {
                     }
                 };
 
-                if let Err(e) = request.send().await {
-                    toast.set(Some(format!("Request failed: {e}")));
+                let response = match request.send().await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        toast.set(Some(format!("Request failed: {e}")));
+                        submitting.set(false);
+                        return;
+                    }
+                };
+
+                if !response.ok() {
+                    let body = response.text().await.unwrap_or_default();
+                    toast.set(Some(if body.is_empty() {
+                        format!("Network configuration failed ({})", response.status())
+                    } else {
+                        body
+                    }));
                     submitting.set(false);
                     return;
                 }
@@ -187,8 +169,9 @@ pub fn network_config_page() -> Html {
                     && let Ok(status) = status_resp.json::<leap_api::types::ProvisionStatus>().await
                 {
                     navigator.replace(&Route::from(status));
-                    submitting.set(false);
                 }
+
+                submitting.set(false);
             });
         })
     };
@@ -215,12 +198,12 @@ pub fn network_config_page() -> Html {
                     <div class="form-field">
                         <label for="ssid">{ "SSID" }</label>
                         <input id="ssid" type="text" placeholder="Network name"
-                            value={(*ssid).clone()} oninput={on_ssid_input} />
+                            value={(*ssid).clone()} oninput={oninput!(ssid)} />
                     </div>
                     <div class="form-field">
                         <label for="password">{ "Password" }</label>
                         <input id="password" type="password" placeholder="Network password"
-                            value={(*password).clone()} oninput={on_password_input} />
+                            value={(*password).clone()} oninput={oninput!(password)} />
                     </div>
                 }
 
@@ -246,17 +229,17 @@ pub fn network_config_page() -> Html {
                     <div class="form-field">
                         <label for="ip-address">{ "IPv4 address" }</label>
                         <input id="ip-address" type="text" placeholder="192.168.1.100"
-                            value={(*ip_address).clone()} oninput={on_ip_address_input} />
+                            value={(*ip_address).clone()} oninput={oninput!(ip_address)} />
                     </div>
                     <div class="form-field">
                         <label for="gateway">{ "Gateway" }</label>
                         <input id="gateway" type="text" placeholder="192.168.1.1"
-                            value={(*gateway).clone()} oninput={on_gateway_input} />
+                            value={(*gateway).clone()} oninput={oninput!(gateway)} />
                     </div>
                     <div class="form-field">
                         <label for="net-mask">{ "Network mask" }</label>
                         <input id="net-mask" type="text" placeholder="255.255.255.0"
-                            value={(*net_mask).clone()} oninput={on_net_mask_input} />
+                            value={(*net_mask).clone()} oninput={oninput!(net_mask)} />
                     </div>
                 }
 

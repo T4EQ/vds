@@ -1,18 +1,12 @@
-use crate::app::{Route, use_provision_redirect};
+use crate::{
+    app::{Route, use_provision_redirect},
+    oninput,
+};
 use gloo_net::http::Request;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 use yew_router::prelude::*;
-
-macro_rules! oninput {
-    ($state:expr) => {{
-        let state = $state.clone();
-        Callback::from(move |e: InputEvent| {
-            state.set(e.target_unchecked_into::<HtmlInputElement>().value());
-        })
-    }};
-}
 
 #[function_component(LeapConfigPage)]
 pub fn leap_config_page() -> Html {
@@ -119,11 +113,7 @@ pub fn leap_config_page() -> Html {
             } else {
                 Some(endpoint_url_val)
             };
-            let force_path_style_opt: Option<bool> = if force_path_style_val {
-                Some(true)
-            } else {
-                None
-            };
+
             let region_opt: Option<String> = if region_val.is_empty() {
                 None
             } else {
@@ -145,7 +135,7 @@ pub fn leap_config_page() -> Html {
                     "access_key_id": access_key_id_val,
                     "secret_access_key": secret_access_key_val,
                     "endpoint_url": endpoint_url_opt,
-                    "force_path_style": force_path_style_opt,
+                    "force_path_style": Some(force_path_style_val),
                     "region": region_opt,
                 }
             });

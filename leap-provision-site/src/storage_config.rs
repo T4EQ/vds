@@ -8,7 +8,7 @@ use yew_router::prelude::*;
 fn format_size(bytes: u64) -> String {
     const GIB: u64 = 1 << 30;
     const MIB: u64 = 1 << 20;
-    const KIB: u64 = 1 << 20;
+    const KIB: u64 = 1 << 10;
     if bytes >= GIB {
         format!("{:.1} GiB", bytes as f64 / GIB as f64)
     } else if bytes >= MIB {
