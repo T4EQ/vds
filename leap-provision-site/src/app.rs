@@ -17,7 +17,7 @@ pub enum Route {
     StorageConfig,
     #[at("/network")]
     NetworkConfig,
-    #[at("/leap-config")]
+    #[at("/leap")]
     LeapConfig,
     #[at("/completed")]
     Completed,
