@@ -19,7 +19,7 @@
 
           nativeBuildInputs = with pkgs; [
             trunk
-            config.packages.wasm-bindgen-cli_0_2_127
+            config.packages.wasm-bindgen-cli_0_2_128
             dart-sass
             lld
           ];
